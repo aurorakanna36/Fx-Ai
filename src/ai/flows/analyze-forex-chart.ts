@@ -20,7 +20,7 @@ const AnalyzeForexChartInputSchema = z.object({
       "A Forex chart image, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
     ),
   aiPersona: z.string().optional().describe('Deskripsi persona kustom untuk AI analisis teks.'),
-  preferredAiProvider: z.enum(['gemini', 'openai']).optional().describe('Penyedia model AI yang dipilih.'),
+  aiModelName: z.string().optional().describe('Nama model AI spesifik yang akan digunakan untuk analisis teks, mis: googleai/gemini-1.5-flash.'),
   isLikelyChart: z.boolean().optional().describe('Apakah gambar kemungkinan adalah chart (output dari pra-validasi).'),
 });
 export type AnalyzeForexChartInput = z.infer<typeof AnalyzeForexChartInputSchema>;
@@ -74,6 +74,9 @@ export async function analyzeForexChart(
   return analyzeForexChartFlow(input);
 }
 
+const DEFAULT_TEXT_MODEL = 'googleai/gemini-2.0-flash';
+const IMAGE_ANNOTATION_MODEL = 'googleai/gemini-2.0-flash-exp';
+
 const analyzeForexChartFlow = ai.defineFlow(
   {
     name: 'analyzeForexChartFlow',
@@ -94,36 +97,36 @@ const analyzeForexChartFlow = ai.defineFlow(
             }
         } catch(validationError) {
             console.error("Error saat validasi gambar oleh AI:", validationError);
-            isLikelyChart = true;
+            // Tetap lanjutkan, asumsikan itu adalah chart jika validasi gagal
+            isLikelyChart = true; 
         }
     }
 
-    let actualTextModel = 'googleai/gemini-2.0-flash'; // Default to Gemini
+    let actualTextModel = (input.aiModelName && input.aiModelName.trim() !== "") ? input.aiModelName.trim() : DEFAULT_TEXT_MODEL;
     let usedTextModelForOutput = actualTextModel;
-    let textModelProvider = 'gemini'; // Default provider
-
-    if (input.preferredAiProvider === 'openai') {
-      // OpenAI package is not installed, so we cannot use OpenAI models.
-      // Log a warning and default to Gemini.
-      console.warn(
-        "Preferensi OpenAI dipilih, tetapi plugin OpenAI tidak tersedia/dihapus. Fallback ke Gemini."
-      );
-      // Ensure we use Gemini if GOOGLE_API_KEY is available
-      if (!process.env.GOOGLE_API_KEY) {
-        throw new Error("Tidak ada GOOGLE_API_KEY yang ditemukan di lingkungan server. Analisis tidak dapat dilanjutkan karena OpenAI tidak tersedia.");
-      }
-      console.log(`Menggunakan model Gemini (${actualTextModel}) untuk analisis teks (fallback dari preferensi OpenAI).`);
-    } else {
-        // Default to Gemini if GOOGLE_API_KEY is available
-        if (!process.env.GOOGLE_API_KEY) {
-            throw new Error("Tidak ada GOOGLE_API_KEY yang ditemukan di lingkungan server. Analisis tidak dapat dilanjutkan.");
-        }
-        console.log(`Menggunakan model Gemini (${actualTextModel}) untuk analisis teks.`);
+    
+    // Cek ketersediaan GOOGLE_API_KEY jika model yang dipilih atau defaultnya adalah model Google
+    if (actualTextModel.startsWith('googleai/') && !process.env.GOOGLE_API_KEY) {
+        console.error(`Model Google (${actualTextModel}) dipilih/default, tetapi GOOGLE_API_KEY tidak ditemukan di lingkungan server.`);
+        throw new Error(`Kunci API Google tidak tersedia. Model (${actualTextModel}) tidak dapat digunakan.`);
     }
+    // Saat ini kita hanya mendukung Google AI karena masalah dengan paket OpenAI
+    if (!actualTextModel.startsWith('googleai/')) {
+        console.warn(`Model yang dimasukkan "${actualTextModel}" bukan model Google AI yang didukung. Fallback ke default: ${DEFAULT_TEXT_MODEL}.`);
+        actualTextModel = DEFAULT_TEXT_MODEL;
+        usedTextModelForOutput = `${input.aiModelName} (Fallback ke ${DEFAULT_TEXT_MODEL} karena tidak didukung/kunci API tidak ada)`;
+        if (!process.env.GOOGLE_API_KEY) {
+             throw new Error(`Kunci API Google tidak tersedia. Model default (${DEFAULT_TEXT_MODEL}) juga tidak dapat digunakan.`);
+        }
+    }
+    
+    console.log(`Menggunakan model ${actualTextModel} untuk analisis teks.`);
     
     const textAnalysisPrompt = ai.definePrompt({
       name: 'analyzeForexChartTextFlexiblePrompt',
-      input: { schema: AnalyzeForexChartInputSchema }, // Pass the full input
+      // Input schema di sini harus mencerminkan apa yang *dibutuhkan oleh template prompt*, bukan seluruh AnalyzeForexChartInputSchema
+      // Kita hanya perlu chartDataUri dan aiPersona untuk template ini
+      input: { schema: z.object({ chartDataUri: z.string(), aiPersona: z.string().optional() }) }, 
       output: { schema: TextAnalysisOutputSchema },
       model: actualTextModel, 
       prompt: `{{#if aiPersona}}
@@ -142,18 +145,19 @@ Berikan output dalam format JSON untuk rekomendasi dan alasan.
 
     const textResponse = await textAnalysisPrompt({
         chartDataUri: input.chartDataUri,
-        aiPersona: input.aiPersona // Pass aiPersona here
-        // preferredAiProvider and isLikelyChart are not needed by this specific prompt's template
+        aiPersona: input.aiPersona,
     });
+
     if (!textResponse.output) {
-      throw new Error('Gagal mendapatkan analisis teks dari AI.');
+      throw new Error(`Gagal mendapatkan analisis teks dari AI menggunakan model ${actualTextModel}.`);
     }
     const { recommendation, reasoning } = textResponse.output;
 
     let annotatedChartDataUri = input.chartDataUri; 
 
-    // Image annotation is currently only supported by Gemini and if GOOGLE_API_KEY is present
-    if (textModelProvider === 'gemini' && process.env.GOOGLE_API_KEY) {
+    // Anotasi gambar hanya dilakukan jika GOOGLE_API_KEY tersedia dan kita menggunakan model Gemini untuk teks
+    // (implikasi bahwa kita tidak mencoba anotasi jika teks dihasilkan oleh provider lain yang mungkin tidak punya kunci API)
+    if (process.env.GOOGLE_API_KEY && actualTextModel.startsWith('googleai/')) {
       const annotationPromptText = `
 Anda adalah asisten pengeditan gambar AI. Tugas Anda adalah menganotasi secara visual gambar grafik Forex yang diberikan berdasarkan analisis yang ada.
 JANGAN membuat grafik baru. MODIFIKASI gambar grafik yang diberikan dengan anotasi.
@@ -178,7 +182,7 @@ Instruksi Anotasi:
 `;
       try {
         const imageGenResponse = await ai.generate({
-          model: 'googleai/gemini-2.0-flash-exp', 
+          model: IMAGE_ANNOTATION_MODEL, 
           prompt: [
             {media: {url: input.chartDataUri}},
             {text: annotationPromptText},
@@ -193,15 +197,15 @@ Instruksi Anotasi:
           console.log("Gambar beranotasi berhasil dibuat oleh AI (Gemini).");
         } else {
           console.warn(
-            'AI (Gemini) tidak mengembalikan gambar beranotasi. Menggunakan gambar asli untuk ditampilkan.'
+            `AI (${IMAGE_ANNOTATION_MODEL}) tidak mengembalikan gambar beranotasi. Menggunakan gambar asli untuk ditampilkan.`
           );
         }
       } catch (err) {
-        console.error('Kesalahan saat membuat gambar beranotasi dengan Gemini:', err);
+        console.error(`Kesalahan saat membuat gambar beranotasi dengan ${IMAGE_ANNOTATION_MODEL}:`, err);
+        // Tetap lanjutkan dengan gambar asli jika anotasi gagal
       }
     } else {
-      // This covers the case where OpenAI was preferred but unavailable, or any other non-Gemini scenario
-      console.log("Anotasi gambar AI dilewati. Menggunakan gambar asli.");
+      console.log("Anotasi gambar AI dilewati (Kunci API Google tidak ada atau model teks bukan Google). Menggunakan gambar asli.");
     }
 
     return {
