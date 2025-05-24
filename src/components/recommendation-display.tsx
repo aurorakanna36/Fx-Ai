@@ -6,17 +6,19 @@ import Image from "next/image";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "./ui/button";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Cpu } from "lucide-react";
 
 interface RecommendationDisplayProps {
   imageDataUri: string; // Can now be the original or annotated image URI
   recommendation: "Buy" | "Sell" | "Wait" | string;
   reasoning: string;
   onBack: () => void;
+  usedTextModel?: string; // Tambahkan prop ini
 }
 
 const RecommendationBadge: React.FC<{ recommendation: RecommendationDisplayProps["recommendation"] }> = ({ recommendation }) => {
-  switch (recommendation.toLowerCase()) {
+  const recLower = typeof recommendation === 'string' ? recommendation.toLowerCase() : '';
+  switch (recLower) {
     case "buy":
       return <Badge className="bg-green-500 hover:bg-green-600 text-white text-lg px-4 py-2">BELI</Badge>;
     case "sell":
@@ -33,11 +35,17 @@ export default function RecommendationDisplay({
   recommendation,
   reasoning,
   onBack,
+  usedTextModel, // Terima prop ini
 }: RecommendationDisplayProps) {
   return (
     <Card className="w-full max-w-2xl mx-auto shadow-xl">
       <CardHeader>
         <CardTitle className="text-2xl text-center">Hasil Analisis AI</CardTitle>
+        {usedTextModel && (
+          <CardDescription className="text-center text-xs text-muted-foreground flex items-center justify-center gap-1">
+            <Cpu className="h-3 w-3"/> Menggunakan: {usedTextModel}
+          </CardDescription>
+        )}
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="relative border rounded-lg overflow-hidden shadow-md">
@@ -58,7 +66,7 @@ export default function RecommendationDisplay({
 
         <div>
           <h3 className="font-semibold text-lg mb-2 text-foreground">Alasan:</h3>
-          <Card className="bg-muted/50 p-4">
+          <Card className="bg-muted/50 p-4 max-h-60 overflow-y-auto">
             <p className="text-sm text-muted-foreground whitespace-pre-wrap">{reasoning}</p>
           </Card>
         </div>

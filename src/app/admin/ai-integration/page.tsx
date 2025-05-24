@@ -6,27 +6,28 @@ import { useForm, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { KeyRound, Settings, UserCog, Cpu, Info } from 'lucide-react';
+import { Settings, UserCog, Cpu, Info, MessageCircleQuestion } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 // Skema validasi untuk form
 const AiIntegrationFormSchema = z.object({
-  apiKey: z.string().optional(), // API Key bersifat opsional di form ini karena hanya simulasi
+  // Kunci API tidak lagi diinput di sini, hanya pemilihan provider
   aiPersona: z.string().optional(),
+  preferredAiProvider: z.enum(['gemini', 'openai']).optional().default('gemini'),
 });
 
 type AiIntegrationFormValues = z.infer<typeof AiIntegrationFormSchema>;
 
-// Model yang digunakan (bisa diambil dari konfigurasi jika lebih dinamis nantinya)
-const TEXT_MODEL_NAME = "googleai/gemini-2.0-flash"; // Sesuai dengan src/ai/genkit.ts
-const IMAGE_MODEL_NAME = "googleai/gemini-2.0-flash-exp"; // Sesuai dengan alur analyze-forex-chart.ts
 const DEFAULT_AI_PERSONA = "Anda adalah seorang analis perdagangan Forex ahli. Analisis gambar grafik Forex yang diberikan.\nBerikan rekomendasi perdagangan (Beli, Jual, atau Tunggu) dan penjelasan rinci mengenai alasan Anda.\nFokus pada wawasan yang jelas dan dapat ditindaklanjuti.";
+const GEMINI_TEXT_MODEL_NAME = "googleai/gemini-2.0-flash";
+const GEMINI_IMAGE_MODEL_NAME = "googleai/gemini-2.0-flash-exp";
+const OPENAI_TEXT_MODEL_NAME = "openai/gpt-4o"; // Contoh model OpenAI
 
 export default function AiIntegrationPage() {
   const { toast } = useToast();
@@ -34,35 +35,33 @@ export default function AiIntegrationPage() {
   const form = useForm<AiIntegrationFormValues>({
     resolver: zodResolver(AiIntegrationFormSchema),
     defaultValues: {
-      apiKey: '',
       aiPersona: DEFAULT_AI_PERSONA,
+      preferredAiProvider: 'gemini',
     },
   });
 
   useEffect(() => {
     // Muat nilai dari localStorage saat komponen dimuat
-    const storedApiKey = localStorage.getItem('aiApiKey_simulated');
     const storedAiPersona = localStorage.getItem('aiCustomPersona');
+    const storedAiProvider = localStorage.getItem('aiProviderPreference') as 'gemini' | 'openai' | null;
     
     form.reset({
-      apiKey: storedApiKey || '',
       aiPersona: storedAiPersona || DEFAULT_AI_PERSONA,
+      preferredAiProvider: storedAiProvider || 'gemini',
     });
   }, [form]);
 
   const onSubmit: SubmitHandler<AiIntegrationFormValues> = (data) => {
-    if (data.apiKey) {
-      localStorage.setItem('aiApiKey_simulated', data.apiKey);
-    } else {
-      localStorage.removeItem('aiApiKey_simulated');
-    }
-    
     if (data.aiPersona && data.aiPersona.trim() !== "") {
       localStorage.setItem('aiCustomPersona', data.aiPersona);
     } else {
-      // Jika kosong, kita bisa menyimpan string kosong atau menghapusnya
-      // agar default dari kode digunakan.
-      localStorage.setItem('aiCustomPersona', ""); // Menyimpan string kosong agar bisa dibaca di page.tsx
+      localStorage.setItem('aiCustomPersona', ""); 
+    }
+
+    if (data.preferredAiProvider) {
+      localStorage.setItem('aiProviderPreference', data.preferredAiProvider);
+    } else {
+      localStorage.removeItem('aiProviderPreference'); // Atau set ke default 'gemini'
     }
 
     toast({
@@ -71,32 +70,36 @@ export default function AiIntegrationPage() {
         <div>
           <p>Pengaturan AI telah berhasil disimpan ke penyimpanan lokal browser Anda.</p>
           <p className="font-semibold mt-2">Catatan Penting Kunci API:</p>
-          <p className="text-xs">Kunci API yang Anda masukkan di sini hanya disimpan secara lokal di browser Anda untuk tujuan simulasi UI ini. Ini TIDAK akan mengubah kunci API yang sebenarnya digunakan oleh layanan AI di backend. Kunci API untuk Genkit dikonfigurasi melalui variabel lingkungan di sisi server.</p>
+          <p className="text-xs">
+            Pemilihan penyedia AI di sini hanya mengatur preferensi model yang akan coba digunakan.
+            Pastikan Kunci API yang sesuai (misalnya, GOOGLE_API_KEY untuk Gemini, OPENAI_API_KEY untuk OpenAI) 
+            telah dikonfigurasi dengan benar di variabel lingkungan sisi server agar pilihan ini berfungsi.
+          </p>
         </div>
       ),
-      duration: 7000, // Tampilkan toast lebih lama agar pesan penting terbaca
+      duration: 9000, 
     });
   };
 
   return (
     <div className="container mx-auto py-8 px-4 space-y-8">
-      <Alert variant="default" className="max-w-2xl mx-auto bg-primary/10 border-primary/30">
+      <Alert variant="default" className="max-w-3xl mx-auto bg-primary/10 border-primary/30">
         <Info className="h-5 w-5 text-primary" />
         <AlertTitle className="text-primary">Informasi Konfigurasi AI</AlertTitle>
         <AlertDescription>
           Halaman ini memungkinkan Anda menyesuaikan beberapa aspek perilaku AI.
-          Perlu diingat bahwa pengelolaan Kunci API yang sebenarnya dilakukan di sisi server.
+          Pengelolaan Kunci API yang sebenarnya dilakukan di sisi server melalui variabel lingkungan.
         </AlertDescription>
       </Alert>
 
-      <Card className="w-full max-w-2xl mx-auto shadow-lg">
+      <Card className="w-full max-w-3xl mx-auto shadow-lg">
         <CardHeader>
           <div className="flex items-center gap-2">
             <Settings className="h-6 w-6 text-primary" />
             <CardTitle className="text-2xl">Pengaturan Integrasi AI</CardTitle>
           </div>
           <CardDescription>
-            Kelola konfigurasi untuk layanan dan metode analisis AI Anda.
+            Kelola preferensi penyedia model AI dan persona kustom untuk analisis.
           </CardDescription>
         </CardHeader>
         <Form {...form}>
@@ -104,24 +107,28 @@ export default function AiIntegrationPage() {
             <CardContent className="space-y-6">
               <FormField
                 control={form.control}
-                name="apiKey"
+                name="preferredAiProvider"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="flex items-center gap-1">
-                      <KeyRound className="h-4 w-4" />
-                      Kunci API AI (Simulasi)
+                      <Cpu className="h-4 w-4" />
+                      Pilih Penyedia Model AI Utama
                     </FormLabel>
-                    <FormControl>
-                      <Input
-                        type="password"
-                        placeholder="Masukkan Kunci API Anda (simulasi)"
-                        {...field}
-                        className="text-sm"
-                      />
-                    </FormControl>
+                    <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Pilih penyedia AI" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="gemini">Google Gemini (Default)</SelectItem>
+                        <SelectItem value="openai">OpenAI GPT-4o (Eksperimental)</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <FormDescription className="text-xs">
-                      Simulasi penyimpanan Kunci API. Disimpan di localStorage browser ini.
-                      Ini TIDAK akan mengubah kunci yang digunakan oleh backend AI.
+                      Memilih penyedia akan memengaruhi model yang digunakan untuk analisis teks.
+                      Anostasi gambar saat ini hanya didukung oleh Gemini.
+                      Pastikan Kunci API yang relevan sudah diatur di server.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -139,31 +146,40 @@ export default function AiIntegrationPage() {
                     </FormLabel>
                     <FormControl>
                       <Textarea
-                        placeholder="Jelaskan bagaimana AI harus berperilaku atau fokus... Kosongkan untuk menggunakan persona default."
+                        placeholder="Jelaskan bagaimana AI harus berperilaku... Kosongkan untuk default."
                         {...field}
                         className="text-sm min-h-[120px]"
                       />
                     </FormControl>
                     <FormDescription className="text-xs">
                       Deskripsi ini akan digunakan sebagai instruksi sistem untuk AI analisis chart.
-                      Kosongkan untuk menggunakan persona default yang ada di kode.
+                      Kosongkan untuk menggunakan persona default.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
               
-              <div className="space-y-2">
+              <div className="space-y-3">
                   <Label className="flex items-center gap-1">
-                      <Cpu className="h-4 w-4" />
-                      Model AI yang Digunakan (Informasi)
+                      <MessageCircleQuestion className="h-4 w-4" />
+                      Model AI yang Mungkin Digunakan (Informasi)
                   </Label>
-                  <div className="text-sm p-3 bg-muted/50 rounded-md space-y-1 border">
-                      <p>Model Analisis Teks & Rekomendasi: <span className="font-semibold">{TEXT_MODEL_NAME}</span></p>
-                      <p>Model Anotasi Gambar: <span className="font-semibold">{IMAGE_MODEL_NAME}</span></p>
+                  <div className="text-sm p-3 bg-muted/50 rounded-md space-y-2 border">
+                      <div>
+                        <p className="font-semibold">Jika memilih Google Gemini:</p>
+                        <p className="ml-2">Model Teks: <span className="font-mono text-xs">{GEMINI_TEXT_MODEL_NAME}</span></p>
+                        <p className="ml-2">Model Anotasi Gambar: <span className="font-mono text-xs">{GEMINI_IMAGE_MODEL_NAME}</span></p>
+                      </div>
+                      <div>
+                        <p className="font-semibold">Jika memilih OpenAI GPT-4o:</p>
+                        <p className="ml-2">Model Teks: <span className="font-mono text-xs">{OPENAI_TEXT_MODEL_NAME}</span></p>
+                        <p className="ml-2">Model Anotasi Gambar: <span className="italic">Tidak ada (gambar asli akan ditampilkan)</span></p>
+                      </div>
                   </div>
                    <p className="text-xs text-muted-foreground">
-                      Saat ini model tidak dapat diubah dari antarmuka ini dan diatur dalam kode.
+                      Model spesifik yang digunakan dapat bervariasi tergantung ketersediaan dan konfigurasi backend.
+                      Pastikan Kunci API (GOOGLE_API_KEY, OPENAI_API_KEY) telah diatur di server.
                    </p>
               </div>
 

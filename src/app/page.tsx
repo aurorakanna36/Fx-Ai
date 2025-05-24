@@ -22,10 +22,13 @@ interface HistoryEntry {
   accuracy?: "Correct" | "Incorrect" | "Pending";
   marketOutcome?: "Up" | "Down" | "Neutral";
   isLikelyChart?: boolean; 
+  usedTextModel?: string;
 }
 
+// Perluas AnalyzeForexChartOutput untuk menyertakan usedTextModel dari alur jika ada
 interface ExtendedAnalyzeForexChartOutput extends AnalyzeForexChartOutput {
   isLikelyChart?: boolean;
+  usedTextModel?: string;
 }
 
 
@@ -87,15 +90,26 @@ export default function ScanChartPage() {
 
     try {
       let aiPersona: string | undefined = undefined;
+      let preferredAiProvider: 'gemini' | 'openai' | undefined = undefined;
+
       if (typeof window !== "undefined") {
         aiPersona = localStorage.getItem('aiCustomPersona') || undefined;
         if (!aiPersona || aiPersona.trim() === "") {
             aiPersona = undefined; 
         }
+        const storedProvider = localStorage.getItem('aiProviderPreference');
+        if (storedProvider === 'gemini' || storedProvider === 'openai') {
+          preferredAiProvider = storedProvider;
+        }
       }
 
-      const input: AnalyzeForexChartInput = { chartDataUri, aiPersona };
-      const result = await analyzeForexChart(input) as ExtendedAnalyzeForexChartOutput;
+      const input: AnalyzeForexChartInput = { 
+        chartDataUri, 
+        aiPersona,
+        preferredAiProvider 
+      };
+      // Cast ke ExtendedAnalyzeForexChartOutput karena kita mengharapkan field tambahan dari flow
+      const result = await analyzeForexChart(input) as ExtendedAnalyzeForexChartOutput; 
       
       let tokenDeductedSuccessfully = true;
       if (currentUser && currentUser.role !== 'admin') {
@@ -108,14 +122,15 @@ export default function ScanChartPage() {
       }
       
       setAnalysisResult(result);
-      if (result.isLikelyChart === false) {
+      if (result.isLikelyChart === false) { // Periksa flag dari hasil AI
         setShowNotAChartWarning(true);
       }
       toast({
         title: "Analisis Selesai",
-        description: `Rekomendasi: ${result.recommendation}`,
+        description: `Rekomendasi: ${result.recommendation}. Model Teks: ${result.usedTextModel || 'Tidak diketahui'}`,
       });
 
+      // Simpan ke riwayat hanya untuk admin dan jika token berhasil dikurangi
       if (currentUser && currentUser.role === 'admin' && chartDataUri && tokenDeductedSuccessfully) { 
         const newHistoryEntry: HistoryEntry = {
           id: `analysis-${Date.now()}`, 
@@ -124,19 +139,20 @@ export default function ScanChartPage() {
           recommendation: result.recommendation,
           reasoning: result.reasoning,
           isLikelyChart: result.isLikelyChart,
+          usedTextModel: result.usedTextModel,
           accuracy: "Pending", 
         };
 
         try {
           const existingHistoryString = localStorage.getItem('chartAnalysesHistory');
           const existingHistory: HistoryEntry[] = existingHistoryString ? JSON.parse(existingHistoryString) : [];
+          
+          // Filter duplikat berdasarkan ID jika ada (seharusnya tidak terjadi dengan timestamp ID)
           const filteredHistory = existingHistory.filter(entry => entry.id !== newHistoryEntry.id);
           const updatedHistory = [newHistoryEntry, ...filteredHistory];
+          
           localStorage.setItem('chartAnalysesHistory', JSON.stringify(updatedHistory));
-          toast({
-            title: "Disimpan ke Riwayat",
-            description: "Hasil analisis telah ditambahkan ke halaman Riwayat Anda.",
-          });
+          // Toast "Disimpan ke Riwayat" tidak lagi ditampilkan untuk guest
         } catch (e) {
           console.error("Gagal menyimpan riwayat ke localStorage:", e);
           toast({
@@ -162,6 +178,8 @@ export default function ScanChartPage() {
   };
   
   if (!currentUser) {
+    // Ini seharusnya tidak terjadi jika ClientLayoutWrapper bekerja dengan benar,
+    // tapi sebagai fallback:
     return <div className="flex justify-center items-center h-screen">Memuat data pengguna...</div>;
   }
 
@@ -169,12 +187,13 @@ export default function ScanChartPage() {
   if (analysisResult && chartDataUri) {
     return (
       <div className="space-y-6">
-        {showNotAChartWarning && (
-          <Alert variant="destructive">
+        {showNotAChartWarning && ( // Peringatan jika gambar bukan chart
+          <Alert variant="destructive" className="max-w-2xl mx-auto">
             <Terminal className="h-4 w-4" />
             <AlertTitle>Peringatan Gambar</AlertTitle>
             <AlertDescription>
-              AI mendeteksi bahwa gambar yang Anda unggah kemungkinan bukan merupakan grafik/chart. Hasil analisis mungkin tidak akurat.
+              AI mendeteksi bahwa gambar yang Anda unggah kemungkinan bukan merupakan grafik/chart. 
+              Hasil analisis mungkin tidak akurat.
             </AlertDescription>
           </Alert>
         )}
@@ -183,6 +202,7 @@ export default function ScanChartPage() {
           recommendation={analysisResult.recommendation}
           reasoning={analysisResult.reasoning}
           onBack={handleFileReset}
+          usedTextModel={analysisResult.usedTextModel}
         />
       </div>
     );
@@ -190,6 +210,7 @@ export default function ScanChartPage() {
 
   return (
     <div className="container mx-auto py-8 px-4 flex flex-col items-center space-y-8">
+      {/* Peringatan token menipis */}
       {currentUser && currentUser.role !== 'admin' && currentUser.tokens > 0 && currentUser.tokens <= 5 && (
         <Alert variant="destructive" className="w-full max-w-md text-sm py-3">
           <AlertCircle className="h-5 w-5" />
@@ -200,6 +221,7 @@ export default function ScanChartPage() {
         </Alert>
       )}
       
+      {/* Tampilan Token untuk Guest */}
       {currentUser && currentUser.role !== 'admin' && (
         <Card className="w-full max-w-md bg-primary/10 border-primary/30">
             <CardContent className="pt-6 text-center">
@@ -222,10 +244,12 @@ export default function ScanChartPage() {
           className="w-full max-w-md"
           disabled={currentUser.role !== 'admin' && currentUser.tokens <= 0}
         >
-          Analisis Grafik {currentUser.role !== 'admin' && currentUser.tokens > 0 && '(1 Token)'}
+          Analisis Grafik 
+          {currentUser.role !== 'admin' && currentUser.tokens > 0 && '(Gunakan 1 Token)'}
           {currentUser.role !== 'admin' && currentUser.tokens <= 0 && '(Token Habis)'}
         </Button>
       )}
+      {/* Peringatan jika token habis */}
       {currentUser.role !== 'admin' && currentUser.tokens <= 0 && chartDataUri && !isLoading && (
         <Alert variant="destructive" className="w-full max-w-md">
           <AlertCircle className="h-4 w-4" />
@@ -251,13 +275,14 @@ export default function ScanChartPage() {
          </Alert>
       )}
 
+      {/* Pesan selamat datang */}
       {!chartDataUri && !isLoading && (
         <Alert className="w-full max-w-lg mt-8">
           <Terminal className="h-4 w-4" />
           <AlertTitle>Selamat Datang di ChartSight AI</AlertTitle>
           <AlertDescription>
             Unggah gambar grafik Forex atau pindai menggunakan kamera Anda untuk mendapatkan wawasan perdagangan berbasis AI.
-            AI akan memberikan rekomendasi Beli, Jual, atau Tunggu beserta alasannya, dan mencoba memberikan anotasi visual pada grafik Anda.
+            AI akan memberikan rekomendasi Beli, Jual, atau Tunggu beserta alasannya, dan mencoba memberikan anotasi visual pada grafik Anda (jika menggunakan Gemini).
             {currentUser.role !== 'admin' && " Setiap analisis menggunakan 1 token."}
           </AlertDescription>
         </Alert>
