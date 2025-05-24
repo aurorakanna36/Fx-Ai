@@ -52,6 +52,12 @@ export default function AiIntegrationPage() {
   const { toast } = useToast();
   const [isDefaultAi, setIsDefaultAi] = useState(true); // Assuming Gemini is default
 
+  const form = useForm<AiIntegrationFormValues>({
+    resolver: zodResolver(aiIntegrationFormSchema),
+    defaultValues,
+    mode: "onChange", // or "onBlur", "onSubmit"
+  });
+
   function onSubmit(data: AiIntegrationFormValues) {
     // In a real application, you would save these settings securely on the server.
     // For this mock, we'll just show a toast.
