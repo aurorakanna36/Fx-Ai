@@ -1,3 +1,4 @@
+
 // src/lib/firebase.ts
 import { initializeApp, type FirebaseApp } from "firebase/app";
 import { getDatabase, type Database } from "firebase/database";
@@ -18,22 +19,29 @@ let app: FirebaseApp | null = null;
 let db: Database | null = null;
 
 try {
-  if (
-    firebaseConfig.apiKey &&
-    firebaseConfig.apiKey !== "YOUR_API_KEY" && // Check if it's not the placeholder
-    firebaseConfig.databaseURL &&
-    !firebaseConfig.databaseURL.includes("YOUR_PROJECT_ID") // Check if it's not the placeholder
-  ) {
+  const isConfigured = firebaseConfig.apiKey &&
+                       firebaseConfig.apiKey !== "YOUR_API_KEY" &&
+                       firebaseConfig.authDomain &&
+                       !firebaseConfig.authDomain.includes("YOUR_PROJECT_ID") &&
+                       firebaseConfig.databaseURL &&
+                       !firebaseConfig.databaseURL.includes("YOUR_PROJECT_ID") &&
+                       firebaseConfig.projectId &&
+                       firebaseConfig.projectId !== "YOUR_PROJECT_ID";
+
+  if (isConfigured) {
     app = initializeApp(firebaseConfig);
     db = getDatabase(app);
-    console.log("Firebase initialized successfully.");
+    console.log("Firebase initialized successfully. Realtime Database should be available.");
   } else {
     console.warn(
-      "Firebase configuration is missing or using placeholder values. Firebase Realtime Database will not be available. Please update src/lib/firebase.ts with your project's configuration."
+      "Firebase configuration is incomplete or using placeholder values. Firebase Realtime Database will NOT be available. Please update src/lib/firebase.ts with your project's configuration for full functionality (like creating new accounts or persisting token data)."
     );
+    // Menetapkan db ke null secara eksplisit jika konfigurasi tidak lengkap
+    db = null; 
   }
 } catch (error) {
   console.error("Error initializing Firebase:", error);
+  console.warn("Due to Firebase initialization error, Realtime Database will not be available.");
   app = null;
   db = null;
 }
