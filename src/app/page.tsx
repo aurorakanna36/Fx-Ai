@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 import { analyzeForexChart, type AnalyzeForexChartInput, type AnalyzeForexChartOutput } from "@/ai/flows/analyze-forex-chart";
 import { useToast } from "@/hooks/use-toast";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Terminal } from "lucide-react";
 
@@ -59,7 +58,7 @@ export default function ScanChartPage() {
       setAnalysisResult(result);
       toast({
         title: "Analisis Selesai",
-        description: `Rekomendasi: ${result.recommendation}`, // RecommendationDisplay will handle translation of the value
+        description: `Rekomendasi: ${result.recommendation}`,
       });
     } catch (err) {
       console.error("Kesalahan Analisis AI:", err);
@@ -78,8 +77,8 @@ export default function ScanChartPage() {
   if (analysisResult && chartDataUri) {
     return (
       <RecommendationDisplay
-        imageDataUri={chartDataUri}
-        recommendation={analysisResult.recommendation} // Pass English value
+        imageDataUri={analysisResult.annotatedChartDataUri || chartDataUri} // Gunakan gambar beranotasi jika ada
+        recommendation={analysisResult.recommendation}
         reasoning={analysisResult.reasoning}
         onBack={handleFileReset}
       />
@@ -117,7 +116,7 @@ export default function ScanChartPage() {
           <AlertTitle>Selamat Datang di ChartSight AI</AlertTitle>
           <AlertDescription>
             Unggah gambar grafik Forex atau pindai menggunakan kamera Anda untuk mendapatkan wawasan perdagangan berbasis AI.
-            AI akan memberikan rekomendasi Beli, Jual, atau Tunggu beserta alasannya.
+            AI akan memberikan rekomendasi Beli, Jual, atau Tunggu beserta alasannya, dan mencoba memberikan anotasi visual pada grafik Anda.
           </AlertDescription>
         </Alert>
       )}

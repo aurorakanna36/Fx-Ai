@@ -9,8 +9,8 @@ import { Button } from "./ui/button";
 import { ArrowLeft } from "lucide-react";
 
 interface RecommendationDisplayProps {
-  imageDataUri: string;
-  recommendation: "Buy" | "Sell" | "Wait" | string; // Receives English value
+  imageDataUri: string; // Can now be the original or annotated image URI
+  recommendation: "Buy" | "Sell" | "Wait" | string;
   reasoning: string;
   onBack: () => void;
 }
@@ -24,7 +24,6 @@ const RecommendationBadge: React.FC<{ recommendation: RecommendationDisplayProps
     case "wait":
       return <Badge variant="secondary" className="text-lg px-4 py-2">TUNGGU</Badge>;
     default:
-      // Fallback for any unexpected values, display as is or a generic term
       return <Badge variant="outline" className="text-lg px-4 py-2">{recommendation.toUpperCase()}</Badge>;
   }
 };
@@ -44,11 +43,11 @@ export default function RecommendationDisplay({
         <div className="relative border rounded-lg overflow-hidden shadow-md">
           <Image
             src={imageDataUri}
-            alt="Grafik yang Dianalisis"
+            alt="Grafik yang Dianalisis (kemungkinan dengan anotasi AI)"
             width={800}
             height={500}
             className="object-contain w-full max-h-[400px]"
-            data-ai-hint="analisis grafik forex"
+            data-ai-hint="analisis grafik forex anotasi"
           />
         </div>
         
