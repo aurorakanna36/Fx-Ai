@@ -55,7 +55,7 @@ export default function AiIntegrationPage() {
   const form = useForm<AiIntegrationFormValues>({
     resolver: zodResolver(aiIntegrationFormSchema),
     defaultValues,
-    mode: "onChange", // or "onBlur", "onSubmit"
+    mode: "onChange",
   });
 
   function onSubmit(data: AiIntegrationFormValues) {
