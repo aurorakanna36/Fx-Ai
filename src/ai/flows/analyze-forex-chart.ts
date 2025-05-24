@@ -52,6 +52,7 @@ const imageValidationPrompt = ai.definePrompt({
   name: 'validateChartImagePrompt',
   input: { schema: ImageValidationInputSchema },
   output: { schema: ImageValidationOutputSchema },
+  model: 'googleai/gemini-2.0-flash', // Using a fast model for validation
   prompt: `Anda adalah AI yang bertugas memvalidasi gambar.
 Gambar yang diberikan: {{media url=chartDataUri}}
 Apakah gambar ini kemungkinan besar adalah sebuah grafik/chart keuangan atau trading (seperti grafik candlestick, line chart harga saham/forex)?
@@ -74,8 +75,8 @@ export async function analyzeForexChart(
   return analyzeForexChartFlow(input);
 }
 
-const DEFAULT_TEXT_MODEL = 'googleai/gemini-2.0-flash';
-const IMAGE_ANNOTATION_MODEL = 'googleai/gemini-2.0-flash-exp';
+const DEFAULT_GOOGLE_TEXT_MODEL = 'googleai/gemini-2.0-flash';
+const IMAGE_ANNOTATION_MODEL = 'googleai/gemini-2.0-flash-exp'; // Specific Gemini model for image editing
 
 const analyzeForexChartFlow = ai.defineFlow(
   {
@@ -86,49 +87,66 @@ const analyzeForexChartFlow = ai.defineFlow(
   async (input: AnalyzeForexChartInput): Promise<AnalyzeForexChartOutput> => {
     let isLikelyChart = input.isLikelyChart;
     if (isLikelyChart === undefined) {
-        try {
-            const validationResponse = await imageValidationPrompt({ chartDataUri: input.chartDataUri });
-            if (validationResponse.output) {
-                isLikelyChart = validationResponse.output.isLikelyChart;
-                console.log("Validasi gambar oleh AI:", validationResponse.output.briefReasoning);
-            } else {
-                console.warn("AI tidak dapat memvalidasi gambar, mengasumsikan itu adalah chart.");
-                isLikelyChart = true;
+        if (!process.env.GOOGLE_API_KEY) {
+            console.warn("Validasi gambar AI dilewati karena GOOGLE_API_KEY tidak ada. Mengasumsikan gambar adalah chart.");
+            isLikelyChart = true;
+        } else {
+            try {
+                const validationResponse = await imageValidationPrompt({ chartDataUri: input.chartDataUri });
+                if (validationResponse.output) {
+                    isLikelyChart = validationResponse.output.isLikelyChart;
+                    console.log("Validasi gambar oleh AI:", validationResponse.output.briefReasoning);
+                } else {
+                    console.warn("AI tidak dapat memvalidasi gambar, mengasumsikan itu adalah chart.");
+                    isLikelyChart = true;
+                }
+            } catch(validationError) {
+                console.error("Error saat validasi gambar oleh AI:", validationError);
+                isLikelyChart = true; 
             }
-        } catch(validationError) {
-            console.error("Error saat validasi gambar oleh AI:", validationError);
-            // Tetap lanjutkan, asumsikan itu adalah chart jika validasi gagal
-            isLikelyChart = true; 
         }
     }
 
-    let actualTextModel = (input.aiModelName && input.aiModelName.trim() !== "") ? input.aiModelName.trim() : DEFAULT_TEXT_MODEL;
-    let usedTextModelForOutput = actualTextModel;
-    
-    // Cek ketersediaan GOOGLE_API_KEY jika model yang dipilih atau defaultnya adalah model Google
-    if (actualTextModel.startsWith('googleai/') && !process.env.GOOGLE_API_KEY) {
-        console.error(`Model Google (${actualTextModel}) dipilih/default, tetapi GOOGLE_API_KEY tidak ditemukan di lingkungan server.`);
-        throw new Error(`Kunci API Google tidak tersedia. Model (${actualTextModel}) tidak dapat digunakan.`);
+    let chosenTextModel = DEFAULT_GOOGLE_TEXT_MODEL;
+    let usedTextModelForOutput = chosenTextModel;
+    let performImageAnnotation = false;
+
+    if (input.aiModelName && input.aiModelName.trim().startsWith('googleai/')) {
+      if (!process.env.GOOGLE_API_KEY) {
+        console.error(`Model Google (${input.aiModelName}) dipilih, tetapi GOOGLE_API_KEY tidak ditemukan di lingkungan server.`);
+        throw new Error(`Kunci API Google tidak tersedia. Model (${input.aiModelName}) tidak dapat digunakan.`);
+      }
+      chosenTextModel = input.aiModelName.trim();
+      usedTextModelForOutput = chosenTextModel;
+      performImageAnnotation = true;
+      console.log(`Menggunakan model Google ${chosenTextModel} untuk analisis teks.`);
+    } else if (input.aiModelName && input.aiModelName.trim() !== "") {
+      // Jika nama model diberikan tetapi bukan Google, default ke Google dan beri tahu
+      console.warn(`Model yang dimasukkan "${input.aiModelName}" tidak dikenal sebagai model Google. Fallback ke default Google: ${DEFAULT_GOOGLE_TEXT_MODEL}.`);
+      if (!process.env.GOOGLE_API_KEY) {
+        console.error(`Model default Google (${DEFAULT_GOOGLE_TEXT_MODEL}) akan digunakan, tetapi GOOGLE_API_KEY tidak ditemukan.`);
+        throw new Error(`Kunci API Google tidak tersedia. Model default (${DEFAULT_GOOGLE_TEXT_MODEL}) juga tidak dapat digunakan.`);
+      }
+      chosenTextModel = DEFAULT_GOOGLE_TEXT_MODEL;
+      usedTextModelForOutput = `${input.aiModelName} (Fallback ke ${chosenTextModel})`;
+      performImageAnnotation = true;
+    } else {
+      // Jika tidak ada nama model, gunakan default Google
+      if (!process.env.GOOGLE_API_KEY) {
+        console.error(`Model default Google (${DEFAULT_GOOGLE_TEXT_MODEL}) akan digunakan, tetapi GOOGLE_API_KEY tidak ditemukan.`);
+        throw new Error(`Kunci API Google tidak tersedia. Model default (${DEFAULT_GOOGLE_TEXT_MODEL}) juga tidak dapat digunakan.`);
+      }
+      chosenTextModel = DEFAULT_GOOGLE_TEXT_MODEL;
+      usedTextModelForOutput = chosenTextModel;
+      performImageAnnotation = true;
+      console.log(`Menggunakan model default Google ${chosenTextModel} untuk analisis teks.`);
     }
-    // Saat ini kita hanya mendukung Google AI karena masalah dengan paket OpenAI
-    if (!actualTextModel.startsWith('googleai/')) {
-        console.warn(`Model yang dimasukkan "${actualTextModel}" bukan model Google AI yang didukung. Fallback ke default: ${DEFAULT_TEXT_MODEL}.`);
-        actualTextModel = DEFAULT_TEXT_MODEL;
-        usedTextModelForOutput = `${input.aiModelName} (Fallback ke ${DEFAULT_TEXT_MODEL} karena tidak didukung/kunci API tidak ada)`;
-        if (!process.env.GOOGLE_API_KEY) {
-             throw new Error(`Kunci API Google tidak tersedia. Model default (${DEFAULT_TEXT_MODEL}) juga tidak dapat digunakan.`);
-        }
-    }
-    
-    console.log(`Menggunakan model ${actualTextModel} untuk analisis teks.`);
     
     const textAnalysisPrompt = ai.definePrompt({
       name: 'analyzeForexChartTextFlexiblePrompt',
-      // Input schema di sini harus mencerminkan apa yang *dibutuhkan oleh template prompt*, bukan seluruh AnalyzeForexChartInputSchema
-      // Kita hanya perlu chartDataUri dan aiPersona untuk template ini
       input: { schema: z.object({ chartDataUri: z.string(), aiPersona: z.string().optional() }) }, 
       output: { schema: TextAnalysisOutputSchema },
-      model: actualTextModel, 
+      model: chosenTextModel as any, // Cast to any because model can be from different providers
       prompt: `{{#if aiPersona}}
 {{{aiPersona}}}
 {{else}}
@@ -149,15 +167,13 @@ Berikan output dalam format JSON untuk rekomendasi dan alasan.
     });
 
     if (!textResponse.output) {
-      throw new Error(`Gagal mendapatkan analisis teks dari AI menggunakan model ${actualTextModel}.`);
+      throw new Error(`Gagal mendapatkan analisis teks dari AI menggunakan model ${chosenTextModel}.`);
     }
     const { recommendation, reasoning } = textResponse.output;
 
     let annotatedChartDataUri = input.chartDataUri; 
 
-    // Anotasi gambar hanya dilakukan jika GOOGLE_API_KEY tersedia dan kita menggunakan model Gemini untuk teks
-    // (implikasi bahwa kita tidak mencoba anotasi jika teks dihasilkan oleh provider lain yang mungkin tidak punya kunci API)
-    if (process.env.GOOGLE_API_KEY && actualTextModel.startsWith('googleai/')) {
+    if (performImageAnnotation && process.env.GOOGLE_API_KEY) {
       const annotationPromptText = `
 Anda adalah asisten pengeditan gambar AI. Tugas Anda adalah menganotasi secara visual gambar grafik Forex yang diberikan berdasarkan analisis yang ada.
 JANGAN membuat grafik baru. MODIFIKASI gambar grafik yang diberikan dengan anotasi.
@@ -168,17 +184,10 @@ Detail Analisis:
 - Alasan Utama: ${reasoning}
 
 Instruksi Anotasi:
-1. Identifikasi elemen kunci dari 'Alasan Utama' yang dapat direpresentasikan secara visual pada grafik. Ini mungkin termasuk:
-    - Garis tren (gambarkan)
-    - Level support dan resistance (gambarkan garis horizontal)
-    - Pola grafik spesifik (misalnya, head and shoulders, segitiga - garis bawahi atau sorot)
-    - Pola candlestick yang disebutkan (misalnya, lingkari atau tunjuk)
-    - Sinyal indikator jika dijelaskan (misalnya, panah pada divergensi RSI)
-2. Timpakan elemen visual ini langsung pada gambar grafik asli yang diberikan.
-3. Gunakan anotasi yang sederhana dan jelas: garis tipis, panah, lingkaran, atau sorotan halus.
-4. Jika menambahkan label teks, buatlah sangat pendek dan letakkan tanpa mengaburkan data grafik utama.
-5. Tujuannya adalah membuat alasan AI lebih mudah dipahami dengan menunjukkan fitur secara visual pada grafik.
-6. Kembalikan gambar yang telah diberi anotasi.
+1. Identifikasi elemen kunci dari 'Alasan Utama' yang dapat direpresentasikan secara visual pada grafik.
+2. Timpakan elemen visual ini langsung pada gambar grafik asli yang diberikan (garis tren, level support/resistance, sorot pola).
+3. Gunakan anotasi yang sederhana dan jelas.
+4. Kembalikan gambar yang telah diberi anotasi.
 `;
       try {
         const imageGenResponse = await ai.generate({
@@ -202,11 +211,13 @@ Instruksi Anotasi:
         }
       } catch (err) {
         console.error(`Kesalahan saat membuat gambar beranotasi dengan ${IMAGE_ANNOTATION_MODEL}:`, err);
-        // Tetap lanjutkan dengan gambar asli jika anotasi gagal
       }
+    } else if (performImageAnnotation && !process.env.GOOGLE_API_KEY) {
+        console.log("Anotasi gambar AI dilewati karena Kunci API Google tidak ada. Menggunakan gambar asli.");
     } else {
-      console.log("Anotasi gambar AI dilewati (Kunci API Google tidak ada atau model teks bukan Google). Menggunakan gambar asli.");
+        console.log("Anotasi gambar AI tidak dilakukan. Menggunakan gambar asli.");
     }
+
 
     return {
       recommendation,

@@ -1,17 +1,20 @@
 import {genkit} from 'genkit';
 import {googleAI} from '@genkit-ai/googleai';
-// import {openAI} from '@genkit-ai/openai'; // OpenAI plugin import removed
+// import {openAI} from '@genkit-ai/openai'; // Dihapus karena masalah instalasi
 
-// Inisialisasi plugin. Pastikan API Key yang sesuai (GOOGLE_API_KEY, OPENAI_API_KEY)
+// Inisialisasi plugin. Pastikan API Key yang sesuai (GOOGLE_API_KEY)
 // sudah diatur di variabel lingkungan server Anda.
 const plugins = [];
 if (process.env.GOOGLE_API_KEY) {
   plugins.push(googleAI());
+  console.log("Google AI plugin loaded.");
 }
-// OpenAI plugin loading removed
-// if (process.env.OPENAI_API_KEY) {
-//   plugins.push(openAI());
-// }
+/*
+if (process.env.OPENAI_API_KEY) {
+  plugins.push(openAI()); // Dihapus
+  console.log("OpenAI plugin loaded.");
+}
+*/
 
 if (plugins.length === 0) {
   console.warn(
@@ -21,9 +24,6 @@ if (plugins.length === 0) {
 
 export const ai = genkit({
   plugins: plugins,
-  // Model default global bisa tetap Gemini, atau bisa juga dihapus jika kita selalu
-  // menentukan model secara eksplisit di setiap panggilan.
-  // Untuk saat ini, kita biarkan karena alur 'explain-trading-recommendation' mungkin masih menggunakannya.
-  // Default to Gemini if Google AI plugin is available, otherwise undefined.
-  model: plugins.some(p => p.name === 'googleAI') ? 'googleai/gemini-2.0-flash' : undefined,
+  // Default model can be specified here if needed, but individual flows will select.
+  // model: plugins.some(p => p.name === 'googleAI') ? 'googleai/gemini-2.0-flash' : undefined,
 });
