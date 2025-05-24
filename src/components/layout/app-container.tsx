@@ -13,15 +13,15 @@ import {
   SidebarMenuButton,
   SidebarInset,
   SidebarTrigger,
-  SidebarFooter, // Added for logout
+  SidebarFooter,
 } from "@/components/ui/sidebar";
-import { ScanLine, History, Settings, BarChart3, Ticket, LogOut, UserCircle } from "lucide-react"; 
+import { ScanLine, History, Settings, BarChart3, Ticket, LogOut, UserCircle, Users } from "lucide-react"; 
 import { useAuth } from "@/contexts/AuthContext";
-import { Button } from "../ui/button"; // Added for logout button
 
 const baseNavItems = [
   { href: "/", label: "Pindai Grafik", icon: <ScanLine />, roles: ['admin', 'guest'] },
   { href: "/history", label: "Riwayat", icon: <History />, roles: ['admin'] },
+  { href: "/admin/user-data", label: "Data Pengguna", icon: <Users />, roles: ['admin'] },
   { href: "/token", label: "Token Saya", icon: <Ticket />, roles: ['guest'] },
   { href: "/admin/ai-integration", label: "Integrasi AI", icon: <Settings />, roles: ['admin'] },
 ];
@@ -35,7 +35,6 @@ export default function AppContainer({ children }: { children: React.ReactNode }
   );
 
   if (!currentUser) {
-    // Ini seharusnya tidak terjadi jika ProtectedLayout bekerja, tapi sebagai fallback
     return <div className="flex justify-center items-center h-screen">Mengalihkan ke login...</div>;
   }
 

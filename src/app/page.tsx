@@ -2,16 +2,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link"; // Ditambahkan untuk link ke halaman token
+import Link from "next/link"; 
 import FileUploader from "@/components/file-uploader";
 import RecommendationDisplay from "@/components/recommendation-display";
 import { Button } from "@/components/ui/button";
-import { Loader2, Terminal, Ticket, AlertCircle } from "lucide-react"; // AlertCircle ditambahkan
+import { Loader2, Terminal, Ticket, AlertCircle } from "lucide-react"; 
 import { analyzeForexChart, type AnalyzeForexChartInput, type AnalyzeForexChartOutput } from "@/ai/flows/analyze-forex-chart";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAuth } from "@/contexts/AuthContext";
-// AlertDialog tidak lagi dibutuhkan untuk notifikasi pengurangan token
 import { Card, CardContent } from "@/components/ui/card";
 
 interface HistoryEntry {
@@ -25,7 +24,6 @@ interface HistoryEntry {
   isLikelyChart?: boolean; 
 }
 
-// Definisikan ulang tipe AnalyzeForexChartOutput agar sesuai dengan yang diharapkan dari alur AI
 interface ExtendedAnalyzeForexChartOutput extends AnalyzeForexChartOutput {
   isLikelyChart?: boolean;
 }
@@ -37,7 +35,6 @@ export default function ScanChartPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showNotAChartWarning, setShowNotAChartWarning] = useState(false);
-  // isTokenDeductionModalOpen dan AlertDialog terkait dihapus
 
   const { toast } = useToast();
   const { currentUser, deductToken } = useAuth();
@@ -104,13 +101,10 @@ export default function ScanChartPage() {
       if (currentUser && currentUser.role !== 'admin') {
         const tokenDeducted = await deductToken();
         if (!tokenDeducted) {
-          // deductToken already shows a toast if it fails due to insufficient tokens
           setIsLoading(false);
           tokenDeductedSuccessfully = false;
-          // Jika token gagal dikurangi (misalnya karena habis di tengah proses), jangan lanjutkan ke penyimpanan riwayat.
           return; 
         }
-        // Modal pop-up sisa token dihapus dari sini. Peringatan akan ada di atas halaman.
       }
       
       setAnalysisResult(result);
@@ -122,7 +116,7 @@ export default function ScanChartPage() {
         description: `Rekomendasi: ${result.recommendation}`,
       });
 
-      if (chartDataUri && tokenDeductedSuccessfully) { 
+      if (currentUser && currentUser.role === 'admin' && chartDataUri && tokenDeductedSuccessfully) { 
         const newHistoryEntry: HistoryEntry = {
           id: `analysis-${Date.now()}`, 
           date: new Date().toISOString(),
@@ -136,7 +130,6 @@ export default function ScanChartPage() {
         try {
           const existingHistoryString = localStorage.getItem('chartAnalysesHistory');
           const existingHistory: HistoryEntry[] = existingHistoryString ? JSON.parse(existingHistoryString) : [];
-          // Pastikan untuk menyaring entri duplikat berdasarkan ID jika ada potensi ID yang sama
           const filteredHistory = existingHistory.filter(entry => entry.id !== newHistoryEntry.id);
           const updatedHistory = [newHistoryEntry, ...filteredHistory];
           localStorage.setItem('chartAnalysesHistory', JSON.stringify(updatedHistory));
@@ -197,7 +190,6 @@ export default function ScanChartPage() {
 
   return (
     <div className="container mx-auto py-8 px-4 flex flex-col items-center space-y-8">
-      {/* Peringatan Token Menipis */}
       {currentUser && currentUser.role !== 'admin' && currentUser.tokens > 0 && currentUser.tokens <= 5 && (
         <Alert variant="destructive" className="w-full max-w-md text-sm py-3">
           <AlertCircle className="h-5 w-5" />
@@ -208,7 +200,6 @@ export default function ScanChartPage() {
         </Alert>
       )}
       
-      {/* Tampilan Token Saat Ini */}
       {currentUser && currentUser.role !== 'admin' && (
         <Card className="w-full max-w-md bg-primary/10 border-primary/30">
             <CardContent className="pt-6 text-center">
@@ -271,10 +262,6 @@ export default function ScanChartPage() {
           </AlertDescription>
         </Alert>
       )}
-
-      {/* AlertDialog untuk notifikasi pengurangan token telah dihapus */}
     </div>
   );
 }
-
-    
