@@ -107,7 +107,7 @@ export default function FileUploader({ onFileChange, currentImagePreview, onFile
                 id="camera-upload"
                 type="file"
                 accept="image/*"
-                capture="environment"
+                // capture="environment" // Dihapus untuk penanganan desktop yang lebih umum
                 onChange={handleFileChange}
                 ref={cameraInputRef}
                 className="hidden"
