@@ -12,13 +12,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
-import { Settings, UserCog, Cpu, Info, MessageCircleQuestion } from 'lucide-react';
+import { Settings, UserCog, Cpu, Info, KeyRound, MessageCircleQuestion } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 // Skema validasi untuk form
 const AiIntegrationFormSchema = z.object({
   aiModelName: z.string().optional().describe("Nama model AI untuk analisis teks, mis: googleai/gemini-1.5-flash"),
   aiPersona: z.string().optional(),
+  customApiKey_simulated: z.string().optional().describe("Kunci API untuk penyedia kustom (hanya untuk catatan admin, tidak digunakan oleh backend)."),
 });
 
 type AiIntegrationFormValues = z.infer<typeof AiIntegrationFormSchema>;
@@ -35,6 +36,7 @@ export default function AiIntegrationPage() {
     defaultValues: {
       aiModelName: DEFAULT_TEXT_MODEL_NAME,
       aiPersona: DEFAULT_AI_PERSONA,
+      customApiKey_simulated: "",
     },
   });
 
@@ -42,10 +44,12 @@ export default function AiIntegrationPage() {
     // Muat nilai dari localStorage saat komponen dimuat
     const storedAiModelName = localStorage.getItem('aiModelNamePreference');
     const storedAiPersona = localStorage.getItem('aiCustomPersona');
+    const storedCustomApiKey = localStorage.getItem('customApiKey_simulated');
     
     form.reset({
       aiModelName: storedAiModelName || DEFAULT_TEXT_MODEL_NAME,
       aiPersona: storedAiPersona || DEFAULT_AI_PERSONA,
+      customApiKey_simulated: storedCustomApiKey || "",
     });
   }, [form]);
 
@@ -53,7 +57,8 @@ export default function AiIntegrationPage() {
     if (data.aiModelName && data.aiModelName.trim() !== "") {
       localStorage.setItem('aiModelNamePreference', data.aiModelName);
     } else {
-      localStorage.setItem('aiModelNamePreference', DEFAULT_TEXT_MODEL_NAME); 
+      // Jika kosong, simpan string kosong agar bisa di-fallback ke default oleh flow
+      localStorage.setItem('aiModelNamePreference', ""); 
     }
 
     if (data.aiPersona && data.aiPersona.trim() !== "") {
@@ -62,22 +67,28 @@ export default function AiIntegrationPage() {
       localStorage.setItem('aiCustomPersona', ""); // Kosongkan jika input kosong, agar default dari kode digunakan
     }
 
+    if (data.customApiKey_simulated && data.customApiKey_simulated.trim() !== "") {
+      localStorage.setItem('customApiKey_simulated', data.customApiKey_simulated);
+    } else {
+      localStorage.removeItem('customApiKey_simulated');
+    }
+
     toast({
       title: "Pengaturan Disimpan",
       description: (
         <div>
           <p>Pengaturan AI telah berhasil disimpan ke penyimpanan lokal browser Anda.</p>
           <p className="font-semibold mt-2">Catatan Penting Kunci API & Model:</p>
-          <p className="text-xs">
-            Nama model AI yang Anda masukkan akan dicoba untuk digunakan untuk analisis teks.
-            Pastikan Kunci API yang sesuai (misalnya, GOOGLE_API_KEY untuk model Google) 
-            telah dikonfigurasi dengan benar di variabel lingkungan sisi server agar pilihan ini berfungsi.
-            Jika model tidak valid atau Kunci API tidak ada, sistem akan mencoba fallback ke model default.
-            Anotasi gambar saat ini tetap menggunakan model Gemini ({GEMINI_IMAGE_MODEL_NAME}).
-          </p>
+          <ul className="list-disc list-inside text-xs space-y-1 mt-1">
+            <li>Nama Model AI yang Anda masukkan akan dicoba untuk digunakan untuk analisis teks (mis. `googleai/gemini-1.5-flash`).</li>
+            <li>Agar model Google berfungsi, pastikan `GOOGLE_API_KEY` telah dikonfigurasi di variabel lingkungan sisi server.</li>
+            <li>Jika model tidak valid atau Kunci API Google tidak ada, sistem akan mencoba fallback ke model Google default.</li>
+            <li>Field "Kunci API Pihak Ketiga" hanya untuk catatan/simulasi Anda dan TIDAK digunakan oleh sistem backend untuk panggilan AI. Kunci API sesungguhnya HARUS diatur sebagai variabel lingkungan di server.</li>
+            <li>Anotasi gambar saat ini tetap menggunakan model Gemini ({GEMINI_IMAGE_MODEL_NAME}).</li>
+          </ul>
         </div>
       ),
-      duration: 9000, 
+      duration: 12000, 
     });
   };
 
@@ -88,7 +99,7 @@ export default function AiIntegrationPage() {
         <AlertTitle className="text-primary">Informasi Konfigurasi AI</AlertTitle>
         <AlertDescription>
           Halaman ini memungkinkan Anda menyesuaikan model AI untuk analisis teks dan persona AI.
-          Pengelolaan Kunci API yang sebenarnya dilakukan di sisi server melalui variabel lingkungan.
+          Pengelolaan Kunci API yang sebenarnya untuk fungsionalitas AI dilakukan di sisi server melalui variabel lingkungan (misalnya, `GOOGLE_API_KEY`).
         </AlertDescription>
       </Alert>
 
@@ -99,7 +110,7 @@ export default function AiIntegrationPage() {
             <CardTitle className="text-2xl">Pengaturan Integrasi AI</CardTitle>
           </div>
           <CardDescription>
-            Kelola nama model AI untuk analisis teks dan persona kustom.
+            Kelola nama model AI untuk analisis teks, persona kustom, dan catatan Kunci API pihak ketiga.
           </CardDescription>
         </CardHeader>
         <Form {...form}>
@@ -122,9 +133,10 @@ export default function AiIntegrationPage() {
                       />
                     </FormControl>
                     <FormDescription className="text-xs">
-                      Masukkan nama model lengkap (misalnya, googleai/gemini-1.5-flash, googleai/gemini-2.0-flash).
-                      Pastikan Kunci API yang relevan (mis. GOOGLE_API_KEY) sudah diatur di server.
-                      Jika kosong atau tidak valid, akan digunakan {DEFAULT_TEXT_MODEL_NAME}.
+                      Masukkan identifier model lengkap yang dikenali Genkit (misalnya, `googleai/gemini-1.5-flash`, `googleai/gemini-2.0-flash`).
+                      Jika model Google yang dipilih, pastikan `GOOGLE_API_KEY` sudah diatur di server.
+                      Jika kosong atau tidak dikenali sebagai model Google, akan digunakan `{DEFAULT_TEXT_MODEL_NAME}` (membutuhkan `GOOGLE_API_KEY`).
+                      Untuk menggunakan model dari penyedia lain (mis. OpenAI, Anthropic), plugin Genkit yang sesuai harus diinstal & dikonfigurasi di backend, dan Kunci API-nya diatur sebagai variabel lingkungan server.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -155,21 +167,46 @@ export default function AiIntegrationPage() {
                   </FormItem>
                 )}
               />
+
+              <FormField
+                control={form.control}
+                name="customApiKey_simulated"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-1">
+                      <KeyRound className="h-4 w-4" />
+                      Kunci API Pihak Ketiga (Simulasi/Catatan Admin)
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        placeholder="Tempel Kunci API di sini untuk catatan Anda"
+                        {...field}
+                        className="text-sm"
+                      />
+                    </FormControl>
+                    <FormDescription className="text-xs text-destructive">
+                      SIMULASI: Field ini hanya untuk catatan Anda dan disimpan di penyimpanan lokal browser.
+                      Kunci API ini TIDAK digunakan oleh sistem backend. Kunci API sesungguhnya HARUS diatur sebagai variabel lingkungan di server.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               
               <div className="space-y-3">
                   <Label className="flex items-center gap-1">
                       <MessageCircleQuestion className="h-4 w-4" />
-                      Informasi Model AI
+                      Informasi Model AI yang Digunakan Sistem
                   </Label>
                   <div className="text-sm p-3 bg-muted/50 rounded-md space-y-2 border">
                       <div>
-                        <p>Model Default untuk Analisis Teks (jika input kosong/tidak valid): <span className="font-mono text-xs">{DEFAULT_TEXT_MODEL_NAME}</span></p>
-                        <p>Model untuk Anotasi Gambar (tetap): <span className="font-mono text-xs">{GEMINI_IMAGE_MODEL_NAME}</span></p>
+                        <p>Default Analisis Teks (jika input model kosong/tidak valid &amp; `GOOGLE_API_KEY` ada): <span className="font-mono text-xs">{DEFAULT_TEXT_MODEL_NAME}</span></p>
+                        <p>Model untuk Anotasi Gambar (tetap, membutuhkan `GOOGLE_API_KEY`): <span className="font-mono text-xs">{GEMINI_IMAGE_MODEL_NAME}</span></p>
                       </div>
                   </div>
                    <p className="text-xs text-muted-foreground">
-                      Model spesifik yang digunakan dapat bervariasi tergantung input Anda, ketersediaan, dan konfigurasi backend.
-                      Pastikan Kunci API (misalnya GOOGLE_API_KEY) telah diatur di server.
+                      Model spesifik yang digunakan untuk analisis teks dapat bervariasi tergantung input Anda, ketersediaan Kunci API di server (mis. `GOOGLE_API_KEY`), dan konfigurasi backend.
                    </p>
               </div>
 
@@ -183,3 +220,5 @@ export default function AiIntegrationPage() {
     </div>
   );
 }
+
+    
