@@ -11,6 +11,20 @@ import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Terminal } from "lucide-react";
 
+// Definisikan tipe untuk entri riwayat agar konsisten dengan HistoryPage
+// Ini bisa diimpor dari tipe bersama jika proyek berkembang
+interface HistoryEntry {
+  id: string;
+  date: string;
+  chartImageUrl: string; // Gambar asli dari pengguna
+  recommendation: "Buy" | "Sell" | "Wait" | string;
+  reasoning: string;
+  // Akurasi dan hasil pasar tidak akan ada saat disimpan dari sini
+  accuracy?: "Correct" | "Incorrect" | "Pending";
+  marketOutcome?: "Up" | "Down" | "Neutral";
+}
+
+
 export default function ScanChartPage() {
   const [chartDataUri, setChartDataUri] = useState<string | null>(null);
   const [analysisResult, setAnalysisResult] = useState<AnalyzeForexChartOutput | null>(null);
@@ -60,6 +74,37 @@ export default function ScanChartPage() {
         title: "Analisis Selesai",
         description: `Rekomendasi: ${result.recommendation}`,
       });
+
+      // Simpan ke riwayat di localStorage
+      if (chartDataUri) { // Pastikan chartDataUri ada
+        const newHistoryEntry: HistoryEntry = {
+          id: `analysis-${Date.now()}`, // ID unik sederhana
+          date: new Date().toISOString(),
+          chartImageUrl: chartDataUri, // Gambar asli yang diunggah pengguna
+          recommendation: result.recommendation,
+          reasoning: result.reasoning,
+          accuracy: "Pending", // Default akurasi ke Pending
+        };
+
+        try {
+          const existingHistoryString = localStorage.getItem('chartAnalysesHistory');
+          const existingHistory: HistoryEntry[] = existingHistoryString ? JSON.parse(existingHistoryString) : [];
+          const updatedHistory = [newHistoryEntry, ...existingHistory];
+          localStorage.setItem('chartAnalysesHistory', JSON.stringify(updatedHistory));
+          toast({
+            title: "Disimpan ke Riwayat",
+            description: "Hasil analisis telah ditambahkan ke halaman Riwayat Anda.",
+          });
+        } catch (e) {
+          console.error("Gagal menyimpan riwayat ke localStorage:", e);
+          toast({
+            title: "Gagal Menyimpan Riwayat",
+            description: "Tidak dapat menyimpan hasil analisis ke riwayat lokal.",
+            variant: "destructive",
+          });
+        }
+      }
+
     } catch (err) {
       console.error("Kesalahan Analisis AI:", err);
       const errorMessage = err instanceof Error ? err.message : "Terjadi kesalahan yang tidak diketahui saat analisis.";
