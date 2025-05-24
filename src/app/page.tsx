@@ -2,23 +2,16 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link"; // Ditambahkan untuk link ke halaman token
 import FileUploader from "@/components/file-uploader";
 import RecommendationDisplay from "@/components/recommendation-display";
 import { Button } from "@/components/ui/button";
-import { Loader2, Terminal, Ticket } from "lucide-react";
+import { Loader2, Terminal, Ticket, AlertCircle } from "lucide-react"; // AlertCircle ditambahkan
 import { analyzeForexChart, type AnalyzeForexChartInput, type AnalyzeForexChartOutput } from "@/ai/flows/analyze-forex-chart";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAuth } from "@/contexts/AuthContext";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+// AlertDialog tidak lagi dibutuhkan untuk notifikasi pengurangan token
 import { Card, CardContent } from "@/components/ui/card";
 
 interface HistoryEntry {
@@ -29,16 +22,22 @@ interface HistoryEntry {
   reasoning: string;
   accuracy?: "Correct" | "Incorrect" | "Pending";
   marketOutcome?: "Up" | "Down" | "Neutral";
-  isLikelyChart?: boolean; // Ditambahkan dari alur
+  isLikelyChart?: boolean; 
 }
+
+// Definisikan ulang tipe AnalyzeForexChartOutput agar sesuai dengan yang diharapkan dari alur AI
+interface ExtendedAnalyzeForexChartOutput extends AnalyzeForexChartOutput {
+  isLikelyChart?: boolean;
+}
+
 
 export default function ScanChartPage() {
   const [chartDataUri, setChartDataUri] = useState<string | null>(null);
-  const [analysisResult, setAnalysisResult] = useState<AnalyzeForexChartOutput | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<ExtendedAnalyzeForexChartOutput | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showNotAChartWarning, setShowNotAChartWarning] = useState(false);
-  const [isTokenDeductionModalOpen, setIsTokenDeductionModalOpen] = useState(false);
+  // isTokenDeductionModalOpen dan AlertDialog terkait dihapus
 
   const { toast } = useToast();
   const { currentUser, deductToken } = useAuth();
@@ -99,16 +98,19 @@ export default function ScanChartPage() {
       }
 
       const input: AnalyzeForexChartInput = { chartDataUri, aiPersona };
-      const result = await analyzeForexChart(input);
+      const result = await analyzeForexChart(input) as ExtendedAnalyzeForexChartOutput;
       
+      let tokenDeductedSuccessfully = true;
       if (currentUser && currentUser.role !== 'admin') {
         const tokenDeducted = await deductToken();
         if (!tokenDeducted) {
           // deductToken already shows a toast if it fails due to insufficient tokens
           setIsLoading(false);
+          tokenDeductedSuccessfully = false;
+          // Jika token gagal dikurangi (misalnya karena habis di tengah proses), jangan lanjutkan ke penyimpanan riwayat.
           return; 
         }
-        setIsTokenDeductionModalOpen(true); // Show success deduction modal
+        // Modal pop-up sisa token dihapus dari sini. Peringatan akan ada di atas halaman.
       }
       
       setAnalysisResult(result);
@@ -120,7 +122,7 @@ export default function ScanChartPage() {
         description: `Rekomendasi: ${result.recommendation}`,
       });
 
-      if (chartDataUri) { 
+      if (chartDataUri && tokenDeductedSuccessfully) { 
         const newHistoryEntry: HistoryEntry = {
           id: `analysis-${Date.now()}`, 
           date: new Date().toISOString(),
@@ -134,7 +136,9 @@ export default function ScanChartPage() {
         try {
           const existingHistoryString = localStorage.getItem('chartAnalysesHistory');
           const existingHistory: HistoryEntry[] = existingHistoryString ? JSON.parse(existingHistoryString) : [];
-          const updatedHistory = [newHistoryEntry, ...existingHistory];
+          // Pastikan untuk menyaring entri duplikat berdasarkan ID jika ada potensi ID yang sama
+          const filteredHistory = existingHistory.filter(entry => entry.id !== newHistoryEntry.id);
+          const updatedHistory = [newHistoryEntry, ...filteredHistory];
           localStorage.setItem('chartAnalysesHistory', JSON.stringify(updatedHistory));
           toast({
             title: "Disimpan ke Riwayat",
@@ -193,6 +197,18 @@ export default function ScanChartPage() {
 
   return (
     <div className="container mx-auto py-8 px-4 flex flex-col items-center space-y-8">
+      {/* Peringatan Token Menipis */}
+      {currentUser && currentUser.role !== 'admin' && currentUser.tokens > 0 && currentUser.tokens <= 5 && (
+        <Alert variant="destructive" className="w-full max-w-md text-sm py-3">
+          <AlertCircle className="h-5 w-5" />
+          <AlertTitle className="font-semibold">Peringatan: Token Menipis!</AlertTitle>
+          <AlertDescription>
+            Sisa token Anda: {currentUser.tokens}. Segera <Link href="/token" className="font-bold underline hover:text-destructive-foreground/90">isi ulang</Link> untuk melanjutkan analisis tanpa gangguan.
+          </AlertDescription>
+        </Alert>
+      )}
+      
+      {/* Tampilan Token Saat Ini */}
       {currentUser && currentUser.role !== 'admin' && (
         <Card className="w-full max-w-md bg-primary/10 border-primary/30">
             <CardContent className="pt-6 text-center">
@@ -215,13 +231,15 @@ export default function ScanChartPage() {
           className="w-full max-w-md"
           disabled={currentUser.role !== 'admin' && currentUser.tokens <= 0}
         >
-          Analisis Grafik {currentUser.role !== 'admin' && '(1 Token)'}
+          Analisis Grafik {currentUser.role !== 'admin' && currentUser.tokens > 0 && '(1 Token)'}
+          {currentUser.role !== 'admin' && currentUser.tokens <= 0 && '(Token Habis)'}
         </Button>
       )}
-      {currentUser.role !== 'admin' && currentUser.tokens <= 0 && chartDataUri && (
+      {currentUser.role !== 'admin' && currentUser.tokens <= 0 && chartDataUri && !isLoading && (
         <Alert variant="destructive" className="w-full max-w-md">
+          <AlertCircle className="h-4 w-4" />
           <AlertTitle>Token Habis</AlertTitle>
-          <AlertDescription>Token Anda tidak cukup untuk melakukan analisis. Silakan isi ulang.</AlertDescription>
+          <AlertDescription>Token Anda tidak cukup untuk melakukan analisis. Silakan <Link href="/token" className="font-bold underline hover:text-destructive-foreground/90">isi ulang</Link>.</AlertDescription>
         </Alert>
       )}
 
@@ -254,19 +272,9 @@ export default function ScanChartPage() {
         </Alert>
       )}
 
-      <AlertDialog open={isTokenDeductionModalOpen} onOpenChange={setIsTokenDeductionModalOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Token Digunakan</AlertDialogTitle>
-            <AlertDialogDescription>
-              1 token telah berhasil digunakan untuk analisis ini. Sisa token Anda: {currentUser?.tokens}.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setIsTokenDeductionModalOpen(false)}>Mengerti</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* AlertDialog untuk notifikasi pengurangan token telah dihapus */}
     </div>
   );
 }
+
+    
