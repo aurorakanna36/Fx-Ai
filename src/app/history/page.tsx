@@ -13,10 +13,10 @@ interface MockAnalysis {
   id: string;
   date: string;
   chartImageUrl: string;
-  recommendation: "Buy" | "Sell" | "Wait";
+  recommendation: "Buy" | "Sell" | "Wait"; // Keep internal values English
   reasoningSnippet: string;
-  accuracy?: "Correct" | "Incorrect" | "Pending"; // Mock accuracy
-  marketOutcome?: "Up" | "Down" | "Neutral"; // Mock actual market outcome
+  accuracy?: "Correct" | "Incorrect" | "Pending"; // Keep internal values English
+  marketOutcome?: "Up" | "Down" | "Neutral"; // Keep internal values English
 }
 
 const mockAnalyses: MockAnalysis[] = [
@@ -25,7 +25,7 @@ const mockAnalyses: MockAnalysis[] = [
     date: "2024-07-28 10:30 AM",
     chartImageUrl: "https://placehold.co/300x200.png",
     recommendation: "Buy",
-    reasoningSnippet: "Strong bullish divergence observed on RSI, MACD crossover imminent...",
+    reasoningSnippet: "Divergensi bullish yang kuat teramati pada RSI, MACD crossover akan segera terjadi...",
     accuracy: "Correct",
     marketOutcome: "Up",
   },
@@ -34,7 +34,7 @@ const mockAnalyses: MockAnalysis[] = [
     date: "2024-07-27 02:15 PM",
     chartImageUrl: "https://placehold.co/300x200.png",
     recommendation: "Sell",
-    reasoningSnippet: "Price broke below key support level, bearish engulfing pattern formed...",
+    reasoningSnippet: "Harga menembus di bawah level support utama, pola bearish engulfing terbentuk...",
     accuracy: "Incorrect",
     marketOutcome: "Up",
   },
@@ -43,7 +43,7 @@ const mockAnalyses: MockAnalysis[] = [
     date: "2024-07-26 09:00 AM",
     chartImageUrl: "https://placehold.co/300x200.png",
     recommendation: "Wait",
-    reasoningSnippet: "Market is consolidating, awaiting clearer signals from major indicators...",
+    reasoningSnippet: "Pasar sedang konsolidasi, menunggu sinyal yang lebih jelas dari indikator utama...",
     accuracy: "Pending",
   },
   {
@@ -51,7 +51,7 @@ const mockAnalyses: MockAnalysis[] = [
     date: "2024-07-25 05:45 PM",
     chartImageUrl: "https://placehold.co/300x200.png",
     recommendation: "Buy",
-    reasoningSnippet: "Golden cross formation on daily chart, positive news sentiment...",
+    reasoningSnippet: "Formasi golden cross pada grafik harian, sentimen berita positif...",
     accuracy: "Correct",
     marketOutcome: "Up",
   },
@@ -67,6 +67,35 @@ const AccuracyIcon = ({ accuracy }: { accuracy?: MockAnalysis["accuracy"] }) => 
   if (accuracy === "Correct") return <CheckCircle className="h-5 w-5 text-green-500" />;
   if (accuracy === "Incorrect") return <XCircle className="h-5 w-5 text-red-500" />;
   return null;
+};
+
+const translateRecommendation = (recommendation: MockAnalysis["recommendation"]): string => {
+  switch (recommendation) {
+    case "Buy": return "Beli";
+    case "Sell": return "Jual";
+    case "Wait": return "Tunggu";
+    default: return recommendation;
+  }
+};
+
+const translateAccuracy = (accuracy?: MockAnalysis["accuracy"]): string => {
+  if (!accuracy) return "";
+  switch (accuracy) {
+    case "Correct": return "Benar";
+    case "Incorrect": return "Salah";
+    case "Pending": return "Tertunda";
+    default: return accuracy;
+  }
+};
+
+const translateMarketOutcome = (outcome?: MockAnalysis["marketOutcome"]): string => {
+  if (!outcome) return "";
+  switch (outcome) {
+    case "Up": return "Naik";
+    case "Down": return "Turun";
+    case "Neutral": return "Netral";
+    default: return outcome;
+  }
 };
 
 export default function HistoryPage() {
@@ -90,13 +119,13 @@ export default function HistoryPage() {
     <div className="container mx-auto py-8 px-4">
       <Card className="mb-8 shadow-lg">
         <CardHeader>
-          <CardTitle className="text-2xl">AI Performance Overview</CardTitle>
-          <CardDescription>Summary of historical AI analysis accuracy.</CardDescription>
+          <CardTitle className="text-2xl">Gambaran Umum Kinerja AI</CardTitle>
+          <CardDescription>Ringkasan akurasi analisis AI historis.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
             <div className="flex justify-between items-center mb-1">
-              <span className="text-sm font-medium text-foreground">Overall Accuracy</span>
+              <span className="text-sm font-medium text-foreground">Akurasi Keseluruhan</span>
               <span className={`text-lg font-semibold ${
                 performanceStatus === "Good" ? "text-green-600" : 
                 performanceStatus === "Declining" ? "text-yellow-500" : "text-red-600"
@@ -104,7 +133,7 @@ export default function HistoryPage() {
                 {overallAccuracy.toFixed(1)}%
               </span>
             </div>
-            <Progress value={overallAccuracy} aria-label="Overall AI Accuracy" className={
+            <Progress value={overallAccuracy} aria-label="Akurasi AI Keseluruhan" className={
               performanceStatus === "Good" ? "[&>div]:bg-green-500" :
               performanceStatus === "Declining" ? "[&>div]:bg-yellow-500" : "[&>div]:bg-red-500"
             } />
@@ -116,8 +145,8 @@ export default function HistoryPage() {
             }`}>
               <AlertCircle className="h-5 w-5 mr-2 shrink-0" />
               <span>
-                AI performance is {performanceStatus.toLowerCase()}. {performanceStatus === "Critical" ? "Maintenance may be required." : "Monitor closely."}
-                {isAdminUser() && " Admin notified."} {/* Placeholder for admin logic */}
+                Kinerja AI {performanceStatus === "Declining" ? "menurun" : "kritis"}. {performanceStatus === "Critical" ? "Pemeliharaan mungkin diperlukan." : "Pantau dengan cermat."}
+                {isAdminUser() && " Admin diberi tahu."}
               </span>
             </div>
           )}
@@ -126,16 +155,16 @@ export default function HistoryPage() {
       
       <Separator className="my-6" />
 
-      <h2 className="text-xl font-semibold mb-6 text-foreground">Analysis History</h2>
+      <h2 className="text-xl font-semibold mb-6 text-foreground">Riwayat Analisis</h2>
       {mockAnalyses.length === 0 ? (
-        <p className="text-center text-muted-foreground">No analysis history available yet.</p>
+        <p className="text-center text-muted-foreground">Belum ada riwayat analisis yang tersedia.</p>
       ) : (
         <div className="space-y-6">
           {mockAnalyses.map((analysis) => (
             <Card key={analysis.id} className="overflow-hidden shadow-md hover:shadow-lg transition-shadow duration-200">
               <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
                 <div>
-                  <CardTitle className="text-lg">Analysis: {analysis.date}</CardTitle>
+                  <CardTitle className="text-lg">Analisis: {analysis.date}</CardTitle>
                   <CardDescription className="text-xs">{analysis.id}</CardDescription>
                 </div>
                 <div className="flex items-center gap-2">
@@ -144,7 +173,7 @@ export default function HistoryPage() {
                     analysis.recommendation === "Buy" ? "default" : 
                     analysis.recommendation === "Sell" ? "destructive" : "secondary"
                   } className={analysis.recommendation === "Buy" ? "bg-green-500 hover:bg-green-600 text-white" : ""}>
-                    {analysis.recommendation}
+                    {translateRecommendation(analysis.recommendation)}
                   </Badge>
                 </div>
               </CardHeader>
@@ -152,11 +181,11 @@ export default function HistoryPage() {
                 <div className="md:col-span-1">
                   <Image
                     src={analysis.chartImageUrl}
-                    alt={`Chart for analysis on ${analysis.date}`}
+                    alt={`Grafik untuk analisis pada ${analysis.date}`}
                     width={300}
                     height={200}
                     className="rounded-md object-cover w-full h-auto border"
-                    data-ai-hint="forex chart history"
+                    data-ai-hint="riwayat grafik forex"
                   />
                 </div>
                 <div className="md:col-span-2 space-y-2">
@@ -165,14 +194,14 @@ export default function HistoryPage() {
                   </p>
                    {analysis.accuracy && analysis.accuracy !== "Pending" && (
                      <div className="flex items-center text-sm">
-                       <span className="font-medium mr-2">Accuracy:</span> 
+                       <span className="font-medium mr-2">Akurasi:</span> 
                        <AccuracyIcon accuracy={analysis.accuracy} />
-                       <span className={`ml-1 ${analysis.accuracy === "Correct" ? "text-green-600" : "text-red-600"}`}>{analysis.accuracy}</span>
-                       {analysis.marketOutcome && <span className="ml-2 text-xs text-muted-foreground">(Market: {analysis.marketOutcome})</span>}
+                       <span className={`ml-1 ${analysis.accuracy === "Correct" ? "text-green-600" : "text-red-600"}`}>{translateAccuracy(analysis.accuracy)}</span>
+                       {analysis.marketOutcome && <span className="ml-2 text-xs text-muted-foreground">(Pasar: {translateMarketOutcome(analysis.marketOutcome)})</span>}
                      </div>
                    )}
                    {analysis.accuracy === "Pending" && (
-                     <p className="text-sm text-blue-500">Accuracy pending market outcome.</p>
+                     <p className="text-sm text-blue-500">Akurasi menunggu hasil pasar.</p>
                    )}
                 </div>
               </CardContent>

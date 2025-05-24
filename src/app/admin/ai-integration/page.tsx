@@ -24,13 +24,13 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const aiIntegrationFormSchema = z.object({
   aiProviderName: z.string().min(2, {
-    message: "AI Provider name must be at least 2 characters.",
+    message: "Nama Penyedia AI minimal harus 2 karakter.",
   }).default("Gemini AI (Default)"),
-  apiKey: z.string().min(10, { // Basic validation for API key length
-    message: "API Key seems too short.",
-  }).optional().or(z.literal('')), // API key can be optional if using default
+  apiKey: z.string().min(10, {
+    message: "Kunci API sepertinya terlalu pendek.",
+  }).optional().or(z.literal('')),
   apiPrompt: z.string().min(20, {
-    message: "API Prompt must be at least 20 characters.",
+    message: "Prompt API minimal harus 20 karakter.",
   }).optional().or(z.literal('')),
 });
 
@@ -40,11 +40,11 @@ type AiIntegrationFormValues = z.infer<typeof aiIntegrationFormSchema>;
 const defaultValues: Partial<AiIntegrationFormValues> = {
   aiProviderName: "Gemini AI (Default)",
   apiKey: "",
-  apiPrompt: `You are an expert Forex trading analyst. Analyze the provided Forex chart image and provide a trading recommendation (Buy, Sell, or Wait) along with a detailed explanation of your reasoning.
+  apiPrompt: `Anda adalah seorang analis perdagangan Forex ahli. Analisis gambar grafik Forex yang diberikan dan berikan rekomendasi perdagangan (Beli, Jual, atau Tunggu) beserta penjelasan rinci mengenai alasan Anda.
 
-Chart Image: {{media url=chartDataUri}}
+Gambar Grafik: {{media url=chartDataUri}}
 
-Provide the output in JSON format.
+Berikan output dalam format JSON.
 `,
 };
 
@@ -52,18 +52,12 @@ export default function AiIntegrationPage() {
   const { toast } = useToast();
   const [isDefaultAi, setIsDefaultAi] = useState(true); // Assuming Gemini is default
 
-  const form = useForm<AiIntegrationFormValues>({
-    resolver: zodResolver(aiIntegrationFormSchema),
-    defaultValues,
-    mode: "onChange",
-  });
-
   function onSubmit(data: AiIntegrationFormValues) {
     // In a real application, you would save these settings securely on the server.
     // For this mock, we'll just show a toast.
-    console.log("AI Integration Data Submitted:", data);
+    console.log("Data Integrasi AI Dikirim:", data);
     toast({
-      title: "AI Settings Updated (Mock)",
+      title: "Pengaturan AI Diperbarui (Tiruan)",
       description: (
         <pre className="mt-2 w-[340px] rounded-md bg-slate-950 p-4">
           <code className="text-white">{JSON.stringify(data, null, 2)}</code>
@@ -78,19 +72,19 @@ export default function AiIntegrationPage() {
         <CardHeader>
           <div className="flex items-center gap-2">
             <KeyRound className="h-6 w-6 text-primary" />
-            <CardTitle className="text-2xl">AI Integration Settings</CardTitle>
+            <CardTitle className="text-2xl">Pengaturan Integrasi AI</CardTitle>
           </div>
           <CardDescription>
-            Configure the AI provider and API settings. This section is for administrators only.
+            Konfigurasikan penyedia AI dan pengaturan API. Bagian ini hanya untuk administrator.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Alert className="mb-6">
             <Terminal className="h-4 w-4" />
-            <AlertTitle>Developer Note</AlertTitle>
+            <AlertTitle>Catatan Pengembang</AlertTitle>
             <AlertDescription>
-              This is a mock interface. API keys and prompts are not saved or used in this demo.
-              In a production environment, handle API keys securely on the server-side.
+              Ini adalah antarmuka tiruan. Kunci API dan prompt tidak disimpan atau digunakan dalam demo ini.
+              Di lingkungan produksi, tangani kunci API dengan aman di sisi server.
             </AlertDescription>
           </Alert>
 
@@ -101,12 +95,12 @@ export default function AiIntegrationPage() {
                 name="aiProviderName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>AI Provider Name</FormLabel>
+                    <FormLabel>Nama Penyedia AI</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., Gemini, OpenAI GPT-4" {...field} />
+                      <Input placeholder="mis., Gemini, OpenAI GPT-4" {...field} />
                     </FormControl>
                     <FormDescription>
-                      Name of the AI service provider currently in use.
+                      Nama penyedia layanan AI yang saat ini digunakan.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -118,12 +112,12 @@ export default function AiIntegrationPage() {
                 name="apiKey"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>API Key {isDefaultAi && "(Optional for Default AI)"}</FormLabel>
+                    <FormLabel>Kunci API {isDefaultAi && "(Opsional untuk AI Default)"}</FormLabel>
                     <FormControl>
-                      <Input type="password" placeholder="Enter API Key for a custom AI" {...field} />
+                      <Input type="password" placeholder="Masukkan Kunci API untuk AI kustom" {...field} />
                     </FormControl>
                     <FormDescription>
-                      Enter the API key for the selected AI provider. Leave blank if using the default integrated AI.
+                      Masukkan kunci API untuk penyedia AI yang dipilih. Biarkan kosong jika menggunakan AI terintegrasi default.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -135,17 +129,17 @@ export default function AiIntegrationPage() {
                 name="apiPrompt"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>AI API Prompt</FormLabel>
+                    <FormLabel>Prompt API AI</FormLabel>
                     <FormControl>
                       <Textarea
-                        placeholder="Enter the system prompt for the AI model..."
+                        placeholder="Masukkan prompt sistem untuk model AI..."
                         className="min-h-[200px] resize-y"
                         {...field}
                       />
                     </FormControl>
                     <FormDescription>
-                      The system prompt used to instruct the AI model for chart analysis.
-                      Use `{{media url=chartDataUri}}` as a placeholder for the chart image.
+                      Prompt sistem yang digunakan untuk menginstruksikan model AI untuk analisis grafik.
+                      Gunakan `{{media url=chartDataUri}}` sebagai placeholder untuk gambar grafik.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -155,11 +149,11 @@ export default function AiIntegrationPage() {
               <Button type="submit" className="w-full sm:w-auto" disabled={form.formState.isSubmitting}>
                 {form.formState.isSubmitting ? (
                   <>
-                    <KeyRound className="mr-2 h-4 w-4 animate-spin" /> Saving...
+                    <KeyRound className="mr-2 h-4 w-4 animate-spin" /> Menyimpan...
                   </>
                 ) : (
                   <>
-                    <Save className="mr-2 h-4 w-4" /> Save Configuration
+                    <Save className="mr-2 h-4 w-4" /> Simpan Konfigurasi
                   </>
                 )}
               </Button>

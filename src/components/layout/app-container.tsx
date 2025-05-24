@@ -1,3 +1,4 @@
+
 "use client";
 
 import type React from "react";
@@ -16,9 +17,9 @@ import {
 import { ScanLine, History, Settings, Briefcase, BarChart3 } from "lucide-react"; // Added Briefcase, BarChart3 for variety
 
 const navItems = [
-  { href: "/", label: "Scan Chart", icon: <ScanLine /> },
-  { href: "/history", label: "History", icon: <History /> },
-  { href: "/admin/ai-integration", label: "AI Integration", icon: <Settings />, adminOnly: true },
+  { href: "/", label: "Pindai Grafik", icon: <ScanLine /> },
+  { href: "/history", label: "Riwayat", icon: <History /> },
+  { href: "/admin/ai-integration", label: "Integrasi AI", icon: <Settings />, adminOnly: true },
 ];
 
 // Placeholder for admin check, in a real app this would use auth context
@@ -75,7 +76,7 @@ export default function AppContainer({ children }: { children: React.ReactNode }
           </div>
           <footer className="border-t bg-background/80 backdrop-blur-sm">
             <div className="container mx-auto px-4 py-3 text-center text-sm text-muted-foreground">
-              ChartSight AI &copy; {new Date().getFullYear()}. AI analysis is for informational purposes only and not financial advice.
+              ChartSight AI &copy; {new Date().getFullYear()}. Analisis AI hanya untuk tujuan informasi dan bukan merupakan nasihat keuangan.
             </div>
           </footer>
         </main>

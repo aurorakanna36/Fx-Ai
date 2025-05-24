@@ -25,12 +25,12 @@ export default function FileUploader({ onFileChange, currentImagePreview, onFile
     const file = event.target.files?.[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) { // 5MB limit
-        setError("File size exceeds 5MB limit.");
+        setError("Ukuran file melebihi batas 5MB.");
         onFileReset(); // Reset if there was a previous image
         return;
       }
       if (!file.type.startsWith("image/")) {
-        setError("Invalid file type. Please upload an image.");
+        setError("Jenis file tidak valid. Silakan unggah gambar.");
         onFileReset();
         return;
       }
@@ -56,26 +56,26 @@ export default function FileUploader({ onFileChange, currentImagePreview, onFile
   return (
     <Card className="w-full max-w-lg mx-auto shadow-lg">
       <CardHeader>
-        <CardTitle>Upload or Scan Chart</CardTitle>
-        <CardDescription>Select an image from your gallery or use your camera.</CardDescription>
+        <CardTitle>Unggah atau Pindai Grafik</CardTitle>
+        <CardDescription>Pilih gambar dari galeri Anda atau gunakan kamera.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {currentImagePreview && (
           <div className="mt-4 relative group">
             <Image
               src={currentImagePreview}
-              alt="Chart preview"
+              alt="Pratinjau Grafik"
               width={600}
               height={400}
               className="rounded-md object-contain max-h-[300px] w-full border"
-              data-ai-hint="forex chart"
+              data-ai-hint="grafik forex"
             />
             <Button
               variant="destructive"
               size="icon"
               onClick={handleReset}
               className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity"
-              aria-label="Remove image"
+              aria-label="Hapus gambar"
             >
               <Trash2 className="h-4 w-4" />
             </Button>
@@ -99,7 +99,7 @@ export default function FileUploader({ onFileChange, currentImagePreview, onFile
                 variant="outline"
               >
                 <UploadCloud className="mr-2 h-4 w-4" />
-                Upload from Gallery
+                Unggah dari Galeri
               </Button>
             </div>
             <div>
@@ -118,7 +118,7 @@ export default function FileUploader({ onFileChange, currentImagePreview, onFile
                 variant="outline"
               >
                 <Camera className="mr-2 h-4 w-4" />
-                Scan with Camera
+                Pindai dengan Kamera
               </Button>
             </div>
           </div>

@@ -42,8 +42,8 @@ export default function ScanChartPage() {
   const handleAnalyzeChart = async () => {
     if (!chartDataUri) {
       toast({
-        title: "No Chart Selected",
-        description: "Please upload or scan a chart first.",
+        title: "Tidak Ada Grafik Terpilih",
+        description: "Silakan unggah atau pindai grafik terlebih dahulu.",
         variant: "destructive",
       });
       return;
@@ -58,15 +58,15 @@ export default function ScanChartPage() {
       const result = await analyzeForexChart(input);
       setAnalysisResult(result);
       toast({
-        title: "Analysis Complete",
-        description: `Recommendation: ${result.recommendation}`,
+        title: "Analisis Selesai",
+        description: `Rekomendasi: ${result.recommendation}`, // RecommendationDisplay will handle translation of the value
       });
     } catch (err) {
-      console.error("AI Analysis Error:", err);
-      const errorMessage = err instanceof Error ? err.message : "An unknown error occurred during analysis.";
-      setError(`Failed to analyze chart: ${errorMessage}`);
+      console.error("Kesalahan Analisis AI:", err);
+      const errorMessage = err instanceof Error ? err.message : "Terjadi kesalahan yang tidak diketahui saat analisis.";
+      setError(`Gagal menganalisis grafik: ${errorMessage}`);
       toast({
-        title: "Analysis Failed",
+        title: "Analisis Gagal",
         description: errorMessage,
         variant: "destructive",
       });
@@ -79,7 +79,7 @@ export default function ScanChartPage() {
     return (
       <RecommendationDisplay
         imageDataUri={chartDataUri}
-        recommendation={analysisResult.recommendation}
+        recommendation={analysisResult.recommendation} // Pass English value
         reasoning={analysisResult.reasoning}
         onBack={handleFileReset}
       />
@@ -92,21 +92,21 @@ export default function ScanChartPage() {
 
       {chartDataUri && !isLoading && (
         <Button onClick={handleAnalyzeChart} size="lg" className="w-full max-w-md">
-          Analyze Chart
+          Analisis Grafik
         </Button>
       )}
 
       {isLoading && (
         <div className="flex flex-col items-center space-y-2 p-4 rounded-md">
           <Loader2 className="h-12 w-12 animate-spin text-primary" />
-          <p className="text-muted-foreground">AI is analyzing your chart...</p>
+          <p className="text-muted-foreground">AI sedang menganalisis grafik Anda...</p>
         </div>
       )}
       
       {error && (
          <Alert variant="destructive" className="w-full max-w-lg">
            <Terminal className="h-4 w-4" />
-           <AlertTitle>Error</AlertTitle>
+           <AlertTitle>Kesalahan</AlertTitle>
            <AlertDescription>{error}</AlertDescription>
          </Alert>
       )}
@@ -114,10 +114,10 @@ export default function ScanChartPage() {
       {!chartDataUri && !isLoading && (
         <Alert className="w-full max-w-lg mt-8">
           <Terminal className="h-4 w-4" />
-          <AlertTitle>Welcome to ChartSight AI</AlertTitle>
+          <AlertTitle>Selamat Datang di ChartSight AI</AlertTitle>
           <AlertDescription>
-            Upload a Forex chart image or scan one using your camera to get AI-powered trading insights.
-            The AI will provide a Buy, Sell, or Wait recommendation along with its reasoning.
+            Unggah gambar grafik Forex atau pindai menggunakan kamera Anda untuk mendapatkan wawasan perdagangan berbasis AI.
+            AI akan memberikan rekomendasi Beli, Jual, atau Tunggu beserta alasannya.
           </AlertDescription>
         </Alert>
       )}
