@@ -11,18 +11,17 @@ import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Terminal } from "lucide-react";
 
-// Definisikan tipe untuk entri riwayat agar konsisten dengan HistoryPage
-// Ini bisa diimpor dari tipe bersama jika proyek berkembang
 interface HistoryEntry {
   id: string;
   date: string;
-  chartImageUrl: string; // Gambar asli dari pengguna
+  chartImageUrl: string; 
   recommendation: "Buy" | "Sell" | "Wait" | string;
   reasoning: string;
-  // Akurasi dan hasil pasar tidak akan ada saat disimpan dari sini
   accuracy?: "Correct" | "Incorrect" | "Pending";
   marketOutcome?: "Up" | "Down" | "Neutral";
 }
+
+const DEFAULT_AI_PERSONA_FALLBACK = "Anda adalah seorang analis perdagangan Forex ahli. Analisis gambar grafik Forex yang diberikan.\nBerikan rekomendasi perdagangan (Beli, Jual, atau Tunggu) dan penjelasan rinci mengenai alasan Anda.\nFokus pada wawasan yang jelas dan dapat ditindaklanjuti.";
 
 
 export default function ScanChartPage() {
@@ -32,16 +31,15 @@ export default function ScanChartPage() {
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // Effect to clear error when chartDataUri changes (new upload attempt)
   useEffect(() => {
     if (chartDataUri) {
-      setError(null); // Clear previous errors when a new image is selected
+      setError(null); 
     }
   }, [chartDataUri]);
 
   const handleFileChange = (dataUri: string, _file: File) => {
     setChartDataUri(dataUri);
-    setAnalysisResult(null); // Reset previous analysis
+    setAnalysisResult(null); 
     setError(null);
   };
 
@@ -67,7 +65,18 @@ export default function ScanChartPage() {
     setAnalysisResult(null);
 
     try {
-      const input: AnalyzeForexChartInput = { chartDataUri };
+      let aiPersona: string | undefined = undefined;
+      if (typeof window !== "undefined") {
+        aiPersona = localStorage.getItem('aiCustomPersona') || undefined;
+        if (!aiPersona || aiPersona.trim() === "") {
+            // Jika kosong atau tidak ada, pastikan kita mengirimkan undefined
+            // agar prompt default di flow digunakan, atau Anda bisa set default di sini.
+            // Untuk konsistensi, biarkan flow menangani default jika persona kosong/undefined.
+            aiPersona = undefined; 
+        }
+      }
+
+      const input: AnalyzeForexChartInput = { chartDataUri, aiPersona };
       const result = await analyzeForexChart(input);
       setAnalysisResult(result);
       toast({
@@ -75,15 +84,14 @@ export default function ScanChartPage() {
         description: `Rekomendasi: ${result.recommendation}`,
       });
 
-      // Simpan ke riwayat di localStorage
-      if (chartDataUri) { // Pastikan chartDataUri ada
+      if (chartDataUri) { 
         const newHistoryEntry: HistoryEntry = {
-          id: `analysis-${Date.now()}`, // ID unik sederhana
+          id: `analysis-${Date.now()}`, 
           date: new Date().toISOString(),
-          chartImageUrl: chartDataUri, // Gambar asli yang diunggah pengguna
+          chartImageUrl: chartDataUri, 
           recommendation: result.recommendation,
           reasoning: result.reasoning,
-          accuracy: "Pending", // Default akurasi ke Pending
+          accuracy: "Pending", 
         };
 
         try {
@@ -122,7 +130,7 @@ export default function ScanChartPage() {
   if (analysisResult && chartDataUri) {
     return (
       <RecommendationDisplay
-        imageDataUri={analysisResult.annotatedChartDataUri || chartDataUri} // Gunakan gambar beranotasi jika ada
+        imageDataUri={analysisResult.annotatedChartDataUri || chartDataUri} 
         recommendation={analysisResult.recommendation}
         reasoning={analysisResult.reasoning}
         onBack={handleFileReset}

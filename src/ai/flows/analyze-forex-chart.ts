@@ -1,3 +1,4 @@
+
 // src/ai/flows/analyze-forex-chart.ts
 'use server';
 
@@ -18,6 +19,7 @@ const AnalyzeForexChartInputSchema = z.object({
     .describe(
       "A Forex chart image, as a data URI that must include a MIME type and use Base64 encoding. Expected format: 'data:<mimetype>;base64,<encoded_data>'."
     ),
+  aiPersona: z.string().optional().describe('Deskripsi persona kustom untuk AI analisis teks.'),
 });
 export type AnalyzeForexChartInput = z.infer<typeof AnalyzeForexChartInputSchema>;
 
@@ -50,11 +52,15 @@ const TextAnalysisOutputSchema = z.object({
 
 const textAnalysisPrompt = ai.definePrompt({
   name: 'analyzeForexChartTextPrompt',
-  input: {schema: AnalyzeForexChartInputSchema},
+  input: {schema: AnalyzeForexChartInputSchema}, // Input schema untuk prompt sekarang menyertakan aiPersona
   output: {schema: TextAnalysisOutputSchema},
-  prompt: `Anda adalah seorang analis perdagangan Forex ahli. Analisis gambar grafik Forex yang diberikan.
+  prompt: `{{#if aiPersona}}
+{{{aiPersona}}}
+{{else}}
+Anda adalah seorang analis perdagangan Forex ahli. Analisis gambar grafik Forex yang diberikan.
 Berikan rekomendasi perdagangan (Beli, Jual, atau Tunggu) dan penjelasan rinci mengenai alasan Anda.
 Fokus pada wawasan yang jelas dan dapat ditindaklanjuti.
+{{/if}}
 
 Gambar Grafik: {{media url=chartDataUri}}
 
@@ -69,7 +75,7 @@ const analyzeForexChartFlow = ai.defineFlow(
     outputSchema: AnalyzeForexChartOutputSchema,
   },
   async (input: AnalyzeForexChartInput): Promise<AnalyzeForexChartOutput> => {
-    // Step 1: Get text-based analysis
+    // Step 1: Get text-based analysis (meneruskan seluruh input termasuk aiPersona)
     const textResponse = await textAnalysisPrompt(input);
     if (!textResponse.output) {
       throw new Error('Gagal mendapatkan analisis teks dari AI.');
@@ -104,7 +110,7 @@ Instruksi Anotasi:
 
     try {
       const imageGenResponse = await ai.generate({
-        model: 'googleai/gemini-2.0-flash-exp', // Model khusus untuk generasi/manipulasi gambar
+        model: 'googleai/gemini-2.0-flash-exp', 
         prompt: [
           {media: {url: input.chartDataUri}},
           {text: annotationPromptText},
