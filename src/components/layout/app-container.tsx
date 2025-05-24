@@ -13,22 +13,31 @@ import {
   SidebarMenuButton,
   SidebarInset,
   SidebarTrigger,
+  SidebarFooter, // Added for logout
 } from "@/components/ui/sidebar";
-import { ScanLine, History, Settings, Briefcase, BarChart3 } from "lucide-react"; // Added Briefcase, BarChart3 for variety
+import { ScanLine, History, Settings, BarChart3, Ticket, LogOut, UserCircle } from "lucide-react"; 
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "../ui/button"; // Added for logout button
 
-const navItems = [
-  { href: "/", label: "Pindai Grafik", icon: <ScanLine /> },
-  { href: "/history", label: "Riwayat", icon: <History /> },
-  { href: "/admin/ai-integration", label: "Integrasi AI", icon: <Settings />, adminOnly: true },
+const baseNavItems = [
+  { href: "/", label: "Pindai Grafik", icon: <ScanLine />, roles: ['admin', 'guest'] },
+  { href: "/history", label: "Riwayat", icon: <History />, roles: ['admin'] },
+  { href: "/token", label: "Token Saya", icon: <Ticket />, roles: ['guest'] },
+  { href: "/admin/ai-integration", label: "Integrasi AI", icon: <Settings />, roles: ['admin'] },
 ];
-
-// Placeholder for admin check, in a real app this would use auth context
-const isAdmin = true; 
 
 export default function AppContainer({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const { currentUser, logout } = useAuth();
 
-  const filteredNavItems = navItems.filter(item => !item.adminOnly || isAdmin);
+  const filteredNavItems = baseNavItems.filter(item => 
+    currentUser && item.roles.includes(currentUser.role)
+  );
+
+  if (!currentUser) {
+    // Ini seharusnya tidak terjadi jika ProtectedLayout bekerja, tapi sebagai fallback
+    return <div className="flex justify-center items-center h-screen">Mengalihkan ke login...</div>;
+  }
 
   return (
     <>
@@ -39,11 +48,10 @@ export default function AppContainer({ children }: { children: React.ReactNode }
               <BarChart3 className="h-6 w-6" />
               <span>ChartSight AI</span>
             </Link>
-            {/* SidebarTrigger for desktop to collapse/expand icon sidebar, hidden on mobile as sidebar becomes a sheet */}
             <SidebarTrigger className="hidden md:flex" />
           </div>
         </SidebarHeader>
-        <SidebarContent className="p-2">
+        <SidebarContent className="p-2 flex flex-col justify-between">
           <SidebarMenu>
             {filteredNavItems.map(item => (
               <SidebarMenuItem key={item.href} className="mb-1">
@@ -60,11 +68,28 @@ export default function AppContainer({ children }: { children: React.ReactNode }
               </SidebarMenuItem>
             ))}
           </SidebarMenu>
+          <SidebarFooter className="p-2 border-t mt-auto">
+            <div className="flex items-center gap-2 p-2 rounded-md bg-sidebar-accent/10 mb-2 group-data-[collapsible=icon]:justify-center">
+                <UserCircle className="h-5 w-5 text-sidebar-foreground"/>
+                <span className="text-xs text-sidebar-foreground group-data-[collapsible=icon]:sr-only">
+                    {currentUser.username} ({currentUser.role})
+                </span>
+            </div>
+            <SidebarMenuButton
+              onClick={logout}
+              tooltip={{content: "Logout", side:"right", align:"center"}}
+              className="justify-start w-full"
+              variant="ghost"
+            >
+              <LogOut />
+              <span className="group-data-[collapsible=icon]:sr-only">Logout</span>
+            </SidebarMenuButton>
+          </SidebarFooter>
         </SidebarContent>
       </Sidebar>
       <SidebarInset>
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 shadow-sm sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 md:hidden"> {/* Mobile header */}
-            <SidebarTrigger /> {/* This trigger opens the sheet on mobile */}
+        <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-4 shadow-sm sm:static sm:h-auto sm:border-0 sm:bg-transparent sm:px-6 md:hidden"> 
+            <SidebarTrigger /> 
             <Link href="/" className="flex items-center gap-2 font-semibold">
               <BarChart3 className="h-6 w-6 text-primary" />
               <span className="text-lg">ChartSight AI</span>

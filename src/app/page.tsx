@@ -5,11 +5,21 @@ import { useState, useEffect } from "react";
 import FileUploader from "@/components/file-uploader";
 import RecommendationDisplay from "@/components/recommendation-display";
 import { Button } from "@/components/ui/button";
-import { Loader2 } from "lucide-react";
+import { Loader2, Terminal, Ticket } from "lucide-react";
 import { analyzeForexChart, type AnalyzeForexChartInput, type AnalyzeForexChartOutput } from "@/ai/flows/analyze-forex-chart";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Terminal } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Card, CardContent } from "@/components/ui/card";
 
 interface HistoryEntry {
   id: string;
@@ -19,21 +29,24 @@ interface HistoryEntry {
   reasoning: string;
   accuracy?: "Correct" | "Incorrect" | "Pending";
   marketOutcome?: "Up" | "Down" | "Neutral";
+  isLikelyChart?: boolean; // Ditambahkan dari alur
 }
-
-const DEFAULT_AI_PERSONA_FALLBACK = "Anda adalah seorang analis perdagangan Forex ahli. Analisis gambar grafik Forex yang diberikan.\nBerikan rekomendasi perdagangan (Beli, Jual, atau Tunggu) dan penjelasan rinci mengenai alasan Anda.\nFokus pada wawasan yang jelas dan dapat ditindaklanjuti.";
-
 
 export default function ScanChartPage() {
   const [chartDataUri, setChartDataUri] = useState<string | null>(null);
   const [analysisResult, setAnalysisResult] = useState<AnalyzeForexChartOutput | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showNotAChartWarning, setShowNotAChartWarning] = useState(false);
+  const [isTokenDeductionModalOpen, setIsTokenDeductionModalOpen] = useState(false);
+
   const { toast } = useToast();
+  const { currentUser, deductToken } = useAuth();
 
   useEffect(() => {
     if (chartDataUri) {
       setError(null); 
+      setShowNotAChartWarning(false);
     }
   }, [chartDataUri]);
 
@@ -41,6 +54,7 @@ export default function ScanChartPage() {
     setChartDataUri(dataUri);
     setAnalysisResult(null); 
     setError(null);
+    setShowNotAChartWarning(false);
   };
 
   const handleFileReset = () => {
@@ -48,6 +62,7 @@ export default function ScanChartPage() {
     setAnalysisResult(null);
     setIsLoading(false);
     setError(null);
+    setShowNotAChartWarning(false);
   };
 
   const handleAnalyzeChart = async () => {
@@ -60,25 +75,46 @@ export default function ScanChartPage() {
       return;
     }
 
+    if (currentUser && currentUser.role !== 'admin' && currentUser.tokens <= 0) {
+      toast({
+        title: "Token Tidak Cukup",
+        description: "Anda tidak memiliki token yang cukup untuk melakukan analisis. Silakan isi ulang token Anda.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     setAnalysisResult(null);
+    setShowNotAChartWarning(false);
 
     try {
       let aiPersona: string | undefined = undefined;
       if (typeof window !== "undefined") {
         aiPersona = localStorage.getItem('aiCustomPersona') || undefined;
         if (!aiPersona || aiPersona.trim() === "") {
-            // Jika kosong atau tidak ada, pastikan kita mengirimkan undefined
-            // agar prompt default di flow digunakan, atau Anda bisa set default di sini.
-            // Untuk konsistensi, biarkan flow menangani default jika persona kosong/undefined.
             aiPersona = undefined; 
         }
       }
 
       const input: AnalyzeForexChartInput = { chartDataUri, aiPersona };
       const result = await analyzeForexChart(input);
+      
+      if (currentUser && currentUser.role !== 'admin') {
+        const tokenDeducted = await deductToken();
+        if (!tokenDeducted) {
+          // deductToken already shows a toast if it fails due to insufficient tokens
+          setIsLoading(false);
+          return; 
+        }
+        setIsTokenDeductionModalOpen(true); // Show success deduction modal
+      }
+      
       setAnalysisResult(result);
+      if (result.isLikelyChart === false) {
+        setShowNotAChartWarning(true);
+      }
       toast({
         title: "Analisis Selesai",
         description: `Rekomendasi: ${result.recommendation}`,
@@ -91,6 +127,7 @@ export default function ScanChartPage() {
           chartImageUrl: chartDataUri, 
           recommendation: result.recommendation,
           reasoning: result.reasoning,
+          isLikelyChart: result.isLikelyChart,
           accuracy: "Pending", 
         };
 
@@ -126,32 +163,74 @@ export default function ScanChartPage() {
       setIsLoading(false);
     }
   };
+  
+  if (!currentUser) {
+    return <div className="flex justify-center items-center h-screen">Memuat data pengguna...</div>;
+  }
+
 
   if (analysisResult && chartDataUri) {
     return (
-      <RecommendationDisplay
-        imageDataUri={analysisResult.annotatedChartDataUri || chartDataUri} 
-        recommendation={analysisResult.recommendation}
-        reasoning={analysisResult.reasoning}
-        onBack={handleFileReset}
-      />
+      <div className="space-y-6">
+        {showNotAChartWarning && (
+          <Alert variant="destructive">
+            <Terminal className="h-4 w-4" />
+            <AlertTitle>Peringatan Gambar</AlertTitle>
+            <AlertDescription>
+              AI mendeteksi bahwa gambar yang Anda unggah kemungkinan bukan merupakan grafik/chart. Hasil analisis mungkin tidak akurat.
+            </AlertDescription>
+          </Alert>
+        )}
+        <RecommendationDisplay
+          imageDataUri={analysisResult.annotatedChartDataUri || chartDataUri} 
+          recommendation={analysisResult.recommendation}
+          reasoning={analysisResult.reasoning}
+          onBack={handleFileReset}
+        />
+      </div>
     );
   }
 
   return (
     <div className="container mx-auto py-8 px-4 flex flex-col items-center space-y-8">
+      {currentUser && currentUser.role !== 'admin' && (
+        <Card className="w-full max-w-md bg-primary/10 border-primary/30">
+            <CardContent className="pt-6 text-center">
+                <div className="flex items-center justify-center gap-2 text-primary">
+                    <Ticket className="h-6 w-6" />
+                    <p className="text-lg">
+                        Token Anda Saat Ini: <span className="font-bold text-2xl">{currentUser.tokens}</span>
+                    </p>
+                </div>
+            </CardContent>
+        </Card>
+      )}
+
       <FileUploader onFileChange={handleFileChange} currentImagePreview={chartDataUri} onFileReset={handleFileReset} />
 
       {chartDataUri && !isLoading && (
-        <Button onClick={handleAnalyzeChart} size="lg" className="w-full max-w-md">
-          Analisis Grafik
+        <Button 
+          onClick={handleAnalyzeChart} 
+          size="lg" 
+          className="w-full max-w-md"
+          disabled={currentUser.role !== 'admin' && currentUser.tokens <= 0}
+        >
+          Analisis Grafik {currentUser.role !== 'admin' && '(1 Token)'}
         </Button>
       )}
+      {currentUser.role !== 'admin' && currentUser.tokens <= 0 && chartDataUri && (
+        <Alert variant="destructive" className="w-full max-w-md">
+          <AlertTitle>Token Habis</AlertTitle>
+          <AlertDescription>Token Anda tidak cukup untuk melakukan analisis. Silakan isi ulang.</AlertDescription>
+        </Alert>
+      )}
+
 
       {isLoading && (
         <div className="flex flex-col items-center space-y-2 p-4 rounded-md">
           <Loader2 className="h-12 w-12 animate-spin text-primary" />
           <p className="text-muted-foreground">AI sedang menganalisis grafik Anda...</p>
+          {currentUser && currentUser.role !== 'admin' && <p className="text-xs text-primary">(Menggunakan 1 token)</p>}
         </div>
       )}
       
@@ -170,9 +249,24 @@ export default function ScanChartPage() {
           <AlertDescription>
             Unggah gambar grafik Forex atau pindai menggunakan kamera Anda untuk mendapatkan wawasan perdagangan berbasis AI.
             AI akan memberikan rekomendasi Beli, Jual, atau Tunggu beserta alasannya, dan mencoba memberikan anotasi visual pada grafik Anda.
+            {currentUser.role !== 'admin' && " Setiap analisis menggunakan 1 token."}
           </AlertDescription>
         </Alert>
       )}
+
+      <AlertDialog open={isTokenDeductionModalOpen} onOpenChange={setIsTokenDeductionModalOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Token Digunakan</AlertDialogTitle>
+            <AlertDialogDescription>
+              1 token telah berhasil digunakan untuk analisis ini. Sisa token Anda: {currentUser?.tokens}.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setIsTokenDeductionModalOpen(false)}>Mengerti</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
