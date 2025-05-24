@@ -1,3 +1,4 @@
+
 // src/contexts/AuthContext.tsx
 "use client";
 
@@ -171,6 +172,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return false;
     }
     setLoading(true);
+
+    // Mencegah pendaftaran username 'admin' atau 'guest' melalui form ini
+    if (usernameInput.toLowerCase() === 'admin' || usernameInput.toLowerCase() === 'guest') {
+      toast({ title: "Registrasi Gagal", description: `Username "${usernameInput}" tidak diizinkan untuk registrasi publik.`, variant: "destructive" });
+      setLoading(false);
+      return false;
+    }
+
     const existingUser = await findUserByUsername(usernameInput);
     if (existingUser) {
       toast({ title: "Registrasi Gagal", description: "Username sudah digunakan.", variant: "destructive" });
@@ -182,10 +191,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const newUid = push(child(ref(db), 'users')).key;
       if (!newUid) throw new Error("Gagal mendapatkan UID baru.");
 
+      // Akun baru selalu memiliki peran 'guest'
       const newUserForDb = {
         username: usernameInput,
         password: passwordInput, // Store plaintext for prototype ONLY. DO NOT DO THIS IN PRODUCTION.
-        role: 'guest' as 'guest',
+        role: 'guest' as 'guest', 
         tokens: 10, // Default tokens for new users
       };
       await set(ref(db, `users/${newUid}`), newUserForDb);
@@ -288,3 +298,6 @@ export const useAuth = (): AuthContextType => {
   }
   return context;
 };
+
+
+    
