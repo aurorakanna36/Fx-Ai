@@ -228,3 +228,64 @@ Instruksi Anotasi:
     };
   }
 );
+import { onRequest } from "firebase-functions/v2/https";
+import { getDatabase } from "firebase-admin/database";
+import { initializeApp } from "firebase-admin/app";
+import { Request, Response } from "express";
+
+// Inisialisasi Firebase Admin SDK
+initializeApp();
+
+export const analyze_chart = onRequest(async (req: Request, res: Response) => {
+  try {
+    const { chartData } = req.body;
+    if (!chartData) {
+      res.status(400).send("chartData diperlukan.");
+      return;
+    }
+
+    // 1. Ambil konfigurasi AI dari Realtime Database
+    const db = getDatabase();
+    const snapshot = await db.ref("/ai_config").once("value");
+    const config = snapshot.val();
+
+    if (!config || !config.aiModelName || !config.aiApiKey) {
+      res.status(500).send("Konfigurasi AI tidak ditemukan.");
+      return;
+    }
+
+    const { aiModelName, aiApiKey, aiPersona } = config;
+
+    // 2. Lakukan pemanggilan ke AI provider (misal OpenAI)
+    // Contoh untuk OpenAI (gunakan SDK resmi atau fetch manual)
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${aiApiKey}`,
+      },
+      body: JSON.stringify({
+        model: aiModelName,
+        messages: [
+          {
+            role: "system",
+            content: aiPersona || "Anda adalah analis teknikal profesional.",
+          },
+          {
+            role: "user",
+            content: `Analisis chart berikut: ${JSON.stringify(chartData)}`,
+          },
+        ],
+      }),
+    });
+
+    const result = await response.json();
+
+    res.status(200).send({
+      result: result.choices?.[0]?.message?.content ?? "Tidak ada jawaban",
+    });
+  } catch (error) {
+    console.error("Gagal menganalisis chart:", error);
+    res.status(500).send("Gagal menganalisis chart.");
+  }
+});
