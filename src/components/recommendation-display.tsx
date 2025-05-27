@@ -1,9 +1,15 @@
-
 "use client";
 
 import type React from "react";
 import Image from "next/image";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  CardFooter,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "./ui/button";
 import { ArrowLeft, Cpu } from "lucide-react";
@@ -14,19 +20,39 @@ interface RecommendationDisplayProps {
   reasoning: string;
   onBack: () => void;
   usedTextModel?: string; // Tambahkan prop ini
+  confidence?: string;
 }
 
-const RecommendationBadge: React.FC<{ recommendation: RecommendationDisplayProps["recommendation"] }> = ({ recommendation }) => {
-  const recLower = typeof recommendation === 'string' ? recommendation.toLowerCase() : '';
+const RecommendationBadge: React.FC<{
+  recommendation: RecommendationDisplayProps["recommendation"];
+}> = ({ recommendation }) => {
+  const recLower =
+    typeof recommendation === "string" ? recommendation.toLowerCase() : "";
   switch (recLower) {
     case "buy":
-      return <Badge className="bg-green-500 hover:bg-green-600 text-white text-lg px-4 py-2">BELI</Badge>;
+      return (
+        <Badge className="bg-green-500 hover:bg-green-600 text-white text-lg px-4 py-2">
+          BELI
+        </Badge>
+      );
     case "sell":
-      return <Badge variant="destructive" className="text-lg px-4 py-2">JUAL</Badge>;
+      return (
+        <Badge variant="destructive" className="text-lg px-4 py-2">
+          JUAL
+        </Badge>
+      );
     case "wait":
-      return <Badge variant="secondary" className="text-lg px-4 py-2">TUNGGU</Badge>;
+      return (
+        <Badge variant="secondary" className="text-lg px-4 py-2">
+          TUNGGU
+        </Badge>
+      );
     default:
-      return <Badge variant="outline" className="text-lg px-4 py-2">{recommendation.toUpperCase()}</Badge>;
+      return (
+        <Badge variant="outline" className="text-lg px-4 py-2">
+          {recommendation.toUpperCase()}
+        </Badge>
+      );
   }
 };
 
@@ -35,15 +61,18 @@ export default function RecommendationDisplay({
   recommendation,
   reasoning,
   onBack,
-  usedTextModel, // Terima prop ini
+  usedTextModel,
+  confidence, // Terima prop ini
 }: RecommendationDisplayProps) {
   return (
     <Card className="w-full max-w-2xl mx-auto shadow-xl">
       <CardHeader>
-        <CardTitle className="text-2xl text-center">Hasil Analisis AI</CardTitle>
+        <CardTitle className="text-2xl text-center">
+          Hasil Analisis AI
+        </CardTitle>
         {usedTextModel && (
           <CardDescription className="text-center text-xs text-muted-foreground flex items-center justify-center gap-1">
-            <Cpu className="h-3 w-3"/> Menggunakan: {usedTextModel}
+            <Cpu className="h-3 w-3" /> Menggunakan: {usedTextModel}
           </CardDescription>
         )}
       </CardHeader>
@@ -58,16 +87,20 @@ export default function RecommendationDisplay({
             data-ai-hint="analisis grafik forex anotasi"
           />
         </div>
-        
+
         <div className="text-center">
           <p className="text-sm text-muted-foreground mb-2">Rekomendasi:</p>
           <RecommendationBadge recommendation={recommendation} />
         </div>
 
         <div>
-          <h3 className="font-semibold text-lg mb-2 text-foreground">Alasan:</h3>
+          <h3 className="font-semibold text-lg mb-2 text-foreground">
+            Alasan:
+          </h3>
           <Card className="bg-muted/50 p-4 max-h-60 overflow-y-auto">
-            <p className="text-sm text-muted-foreground whitespace-pre-wrap">{reasoning}</p>
+            <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+              {reasoning}
+            </p>
           </Card>
         </div>
       </CardContent>

@@ -1,5 +1,5 @@
-import { config } from 'dotenv';
+import { config } from "dotenv";
 config();
 
-import '@/ai/flows/analyze-forex-chart.ts';
-import '@/ai/flows/explain-trading-recommendation.ts';
+import "@/app/api/analyze-chart/route";
+import "@/app/api/explain-trading-recommendation";

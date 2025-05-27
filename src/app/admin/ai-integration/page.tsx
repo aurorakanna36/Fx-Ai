@@ -1,31 +1,54 @@
-
 "use client";
 
-import { useEffect } from 'react';
 import { useForm, type SubmitHandler } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { useToast } from "@/hooks/use-toast";
-import { Settings, UserCog, Cpu, Info, MessageCircleQuestion } from 'lucide-react';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Label } from "@/components/ui/label";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  CardFooter,
+} from "@/components/ui/card";
+import {
+  Settings,
+  UserCog,
+  Cpu,
+  Info,
+  MessageCircleQuestion,
+  KeyRound,
+} from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 
-// Skema validasi untuk form
+// ✅ Validasi hanya untuk apiKey (wajib)
 const AiIntegrationFormSchema = z.object({
-  aiModelName: z.string().optional().describe("Nama model Google AI untuk analisis teks, mis: googleai/gemini-1.5-flash. Biarkan kosong untuk default."),
-  aiPersona: z.string().optional().describe("Persona kustom untuk AI analisis teks. Biarkan kosong untuk default."),
+  apiKey: z.string().min(1, "API Key tidak boleh kosong"),
+  aiModelName: z.string().optional(),
+  aiPersona: z.string().optional(),
 });
 
 type AiIntegrationFormValues = z.infer<typeof AiIntegrationFormSchema>;
 
-const DEFAULT_AI_PERSONA = "Anda adalah seorang analis perdagangan Forex ahli. Analisis gambar grafik Forex yang diberikan.\nBerikan rekomendasi perdagangan (Beli, Jual, atau Tunggu) dan penjelasan rinci mengenai alasan Anda.\nFokus pada wawasan yang jelas dan dapat ditindaklanjuti.";
-const DEFAULT_TEXT_MODEL_NAME = "googleai/gemini-2.0-flash"; // Default model teks dari Google
-const GEMINI_IMAGE_MODEL_NAME = "googleai/gemini-2.0-flash-exp"; // Model untuk anotasi gambar tetap dari Google
+const DEFAULT_AI_PERSONA =
+  "Anda adalah seorang analis perdagangan Forex ahli. Analisis gambar grafik Forex yang diberikan.\n" +
+  "Berikan rekomendasi perdagangan (BUY, SELL, atau WAIT) dan penjelasan rinci mengenai alasan Anda.\n" +
+  "Fokus pada wawasan yang jelas dan dapat ditindaklanjuti.";
+
+const DEFAULT_TEXT_MODEL_NAME = "deepseek/deepseek-prover-v2:free";
 
 export default function AiIntegrationPage() {
   const { toast } = useToast();
@@ -33,66 +56,54 @@ export default function AiIntegrationPage() {
   const form = useForm<AiIntegrationFormValues>({
     resolver: zodResolver(AiIntegrationFormSchema),
     defaultValues: {
-      aiModelName: "", // Akan diisi dari localStorage atau default
-      aiPersona: "",   // Akan diisi dari localStorage atau default
+      apiKey: "",
+      aiModelName: "",
+      aiPersona: DEFAULT_AI_PERSONA,
     },
   });
 
-  useEffect(() => {
-    const storedAiModelName = localStorage.getItem('aiModelNamePreference');
-    const storedAiPersona = localStorage.getItem('aiCustomPersona');
-    
-    form.reset({
-      aiModelName: storedAiModelName || "", // Jangan set default di sini, biarkan flow AI yang fallback jika kosong
-      aiPersona: storedAiPersona || DEFAULT_AI_PERSONA,
-    });
-  }, [form]);
+  const onSubmit: SubmitHandler<AiIntegrationFormValues> = async (data) => {
+    try {
+      const res = await fetch("/api/set-ai-config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          apiKey: data.apiKey.trim(),
+          aiModelName: data.aiModelName?.trim() || DEFAULT_TEXT_MODEL_NAME,
+          aiPersona: data.aiPersona?.trim() || DEFAULT_AI_PERSONA,
+        }),
+      });
 
-  const onSubmit: SubmitHandler<AiIntegrationFormValues> = (data) => {
-    // Simpan nama model Google AI
-    if (data.aiModelName && data.aiModelName.trim() !== "") {
-      localStorage.setItem('aiModelNamePreference', data.aiModelName.trim());
-    } else {
-      // Jika kosong, biarkan kosong di localStorage agar flow AI menggunakan defaultnya
-      localStorage.setItem('aiModelNamePreference', ""); 
+      const result = await res.json();
+      if (!res.ok || !result.success) {
+        throw new Error(result.error || "Gagal menyimpan konfigurasi AI");
+      }
+
+      toast({
+        title: "Berhasil",
+        description: "Konfigurasi AI berhasil disimpan ke Firebase.",
+      });
+    } catch (e) {
+      toast({
+        title: "Gagal Menyimpan",
+        description: (e as Error).message,
+        variant: "destructive",
+      });
     }
-
-    // Simpan persona AI kustom
-    if (data.aiPersona && data.aiPersona.trim() !== "") {
-      localStorage.setItem('aiCustomPersona', data.aiPersona.trim());
-    } else {
-      // Jika persona kosong, simpan string kosong agar default dari kode alur AI digunakan
-      localStorage.setItem('aiCustomPersona', ""); 
-    }
-
-    toast({
-      title: "Pengaturan Disimpan",
-      description: (
-        <div>
-          <p>Preferensi model AI dan persona telah disimpan ke penyimpanan lokal browser Anda.</p>
-          <p className="font-semibold mt-2">Catatan Penting:</p>
-          <ul className="list-disc list-inside text-xs space-y-1 mt-1">
-            <li>Aplikasi ini menggunakan model AI dari Google (Gemini).</li>
-            <li>Agar model Google AI berfungsi, pastikan variabel lingkungan `GOOGLE_API_KEY` telah dikonfigurasi dengan benar di sisi server.</li>
-            <li>Jika "Nama Model Google AI" yang Anda masukkan tidak valid atau `GOOGLE_API_KEY` tidak ada, sistem akan mencoba fallback ke model Google default ({DEFAULT_TEXT_MODEL_NAME}).</li>
-            <li>Anotasi gambar saat ini tetap menggunakan model Google ({GEMINI_IMAGE_MODEL_NAME}).</li>
-            <li>Menggunakan API dari penyedia lain (misalnya DeepSeek, OpenAI) saat ini tidak didukung secara langsung melalui UI ini karena memerlukan perubahan backend (plugin Genkit & konfigurasi Kunci API server).</li>
-          </ul>
-        </div>
-      ),
-      duration: 15000, 
-    });
   };
 
   return (
     <div className="container mx-auto py-8 px-4 space-y-8">
-      <Alert variant="default" className="max-w-3xl mx-auto bg-primary/10 border-primary/30">
+      <Alert
+        variant="default"
+        className="max-w-3xl mx-auto bg-primary/10 border-primary/30"
+      >
         <Info className="h-5 w-5 text-primary" />
-        <AlertTitle className="text-primary">Konfigurasi Model & Persona AI</AlertTitle>
+        <AlertTitle className="text-primary">Integrasi AI Global</AlertTitle>
         <AlertDescription>
-          Halaman ini memungkinkan Anda menyesuaikan preferensi model Google AI untuk analisis teks dan persona AI.
-          Fungsionalitas AI bergantung pada konfigurasi `GOOGLE_API_KEY` yang benar di variabel lingkungan sisi server.
-          Integrasi dengan penyedia AI lain memerlukan modifikasi backend.
+          Admin dapat mengatur API Key, model AI, dan persona untuk analisis
+          grafik. Konfigurasi ini akan digunakan oleh sistem untuk semua
+          analisis.
         </AlertDescription>
       </Alert>
 
@@ -100,15 +111,38 @@ export default function AiIntegrationPage() {
         <CardHeader>
           <div className="flex items-center gap-2">
             <Settings className="h-6 w-6 text-primary" />
-            <CardTitle className="text-2xl">Pengaturan Integrasi AI (Google AI)</CardTitle>
+            <CardTitle className="text-2xl">Pengaturan AI</CardTitle>
           </div>
           <CardDescription>
-            Kelola nama model Google AI untuk analisis teks dan persona kustom.
+            Sistem akan menggunakan konfigurasi ini untuk semua analisis grafik.
           </CardDescription>
         </CardHeader>
+
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <CardContent className="space-y-6">
+              <FormField
+                control={form.control}
+                name="apiKey"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-1">
+                      <KeyRound className="h-4 w-4" />
+                      API Key
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        type="password"
+                        placeholder="Masukkan API Key dari penyedia AI"
+                        {...field}
+                        className="text-sm"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
               <FormField
                 control={form.control}
                 name="aiModelName"
@@ -116,21 +150,15 @@ export default function AiIntegrationPage() {
                   <FormItem>
                     <FormLabel className="flex items-center gap-1">
                       <Cpu className="h-4 w-4" />
-                      Nama Model Google AI untuk Analisis Teks
+                      Nama Model AI
                     </FormLabel>
                     <FormControl>
                       <Input
-                        placeholder={`mis: googleai/gemini-1.5-flash (kosongkan untuk default: ${DEFAULT_TEXT_MODEL_NAME})`}
+                        placeholder="Contoh: deepseek/deepseek-prover-v2:free"
                         {...field}
                         className="text-sm"
                       />
                     </FormControl>
-                    <FormDescription className="text-xs">
-                      Masukkan identifier model Google AI yang valid (misalnya, `googleai/gemini-1.5-flash`).
-                      Pastikan `GOOGLE_API_KEY` sudah diatur di server.
-                      Jika kosong, akan digunakan model default: `{DEFAULT_TEXT_MODEL_NAME}`.
-                      Jika model yang dimasukkan tidak valid atau bukan model Google, sistem akan fallback ke default Google.
-                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -143,43 +171,38 @@ export default function AiIntegrationPage() {
                   <FormItem>
                     <FormLabel className="flex items-center gap-1">
                       <UserCog className="h-4 w-4" />
-                      Persona AI Kustom untuk Analisis Teks
+                      Persona AI
                     </FormLabel>
                     <FormControl>
                       <Textarea
-                        placeholder="Jelaskan bagaimana AI harus berperilaku... Kosongkan untuk default."
+                        placeholder="Instruksi khusus untuk AI dalam menganalisis chart"
                         {...field}
                         className="text-sm min-h-[120px]"
                       />
                     </FormControl>
-                    <FormDescription className="text-xs">
-                      Deskripsi ini akan digunakan sebagai instruksi sistem untuk AI analisis chart.
-                      Kosongkan untuk menggunakan persona default (didefinisikan di kode alur AI).
-                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              
-              <div className="space-y-3">
-                  <Label className="flex items-center gap-1">
-                      <MessageCircleQuestion className="h-4 w-4" />
-                      Informasi Model AI Sistem
-                  </Label>
-                  <div className="text-sm p-3 bg-muted/50 rounded-md space-y-2 border">
-                      <div>
-                        <p>Analisis Teks (Google AI): Jika input model di atas kosong atau tidak valid, akan digunakan <span className="font-mono text-xs">{DEFAULT_TEXT_MODEL_NAME}</span> (membutuhkan `GOOGLE_API_KEY`).</p>
-                        <p>Anotasi Gambar (Google AI): Tetap menggunakan <span className="font-mono text-xs">{GEMINI_IMAGE_MODEL_NAME}</span> (membutuhkan `GOOGLE_API_KEY`).</p>
-                      </div>
-                  </div>
-                   <p className="text-xs text-muted-foreground">
-                      Model spesifik yang digunakan untuk analisis teks bergantung pada input Anda dan ketersediaan `GOOGLE_API_KEY` di server.
-                   </p>
-              </div>
 
+              <div className="space-y-2 text-xs text-muted-foreground">
+                <Label className="flex items-center gap-1">
+                  <MessageCircleQuestion className="h-4 w-4" />
+                  Catatan:
+                </Label>
+                <p>
+                  Simpan API Key dan model yang valid dari penyedia seperti
+                  OpenRouter, DeepSeek, Gemini, Claude, dll.
+                </p>
+                <p>
+                  Jika model kosong, sistem akan menggunakan default:{" "}
+                  <code>{DEFAULT_TEXT_MODEL_NAME}</code>
+                </p>
+              </div>
             </CardContent>
+
             <CardFooter>
-              <Button type="submit">Simpan Pengaturan</Button>
+              <Button type="submit">Simpan Konfigurasi</Button>
             </CardFooter>
           </form>
         </Form>
@@ -187,4 +210,3 @@ export default function AiIntegrationPage() {
     </div>
   );
 }
-    

@@ -5,12 +5,7 @@ import Link from "next/link";
 import FileUploader from "@/components/file-uploader";
 import RecommendationDisplay from "@/components/recommendation-display";
 import { Button } from "@/components/ui/button";
-import { Loader2, Terminal, Ticket, AlertCircle } from "lucide-react";
-import {
-  analyzeForexChart,
-  type AnalyzeForexChartInput,
-  type AnalyzeForexChartOutput,
-} from "@/ai/flows/analyze-forex-chart";
+import { Loader2, Terminal, Ticket, AlertCircle, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useAuth } from "@/contexts/AuthContext";
@@ -28,19 +23,28 @@ interface HistoryEntry {
   usedTextModel?: string;
 }
 
-// Perluas AnalyzeForexChartOutput untuk menyertakan usedTextModel dari alur jika ada
-interface ExtendedAnalyzeForexChartOutput extends AnalyzeForexChartOutput {
-  isLikelyChart?: boolean;
-  usedTextModel?: string;
+interface AnalysisResult {
+  recommendation: string;
+  explanation: string;
+  confidence: string;
+}
+
+interface ApiResponse {
+  success: boolean;
+  result: AnalysisResult;
+  provider: string;
+  aiModelName: string;
 }
 
 export default function ScanChartPage() {
   const [chartDataUri, setChartDataUri] = useState<string | null>(null);
-  const [analysisResult, setAnalysisResult] =
-    useState<ExtendedAnalyzeForexChartOutput | null>(null);
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(
+    null
+  );
+  const [usedModel, setUsedModel] = useState<string>("");
+  const [usedProvider, setUsedProvider] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [showNotAChartWarning, setShowNotAChartWarning] = useState(false);
 
   const { toast } = useToast();
   const { currentUser, deductToken } = useAuth();
@@ -48,7 +52,6 @@ export default function ScanChartPage() {
   useEffect(() => {
     if (chartDataUri) {
       setError(null);
-      setShowNotAChartWarning(false);
     }
   }, [chartDataUri]);
 
@@ -56,15 +59,15 @@ export default function ScanChartPage() {
     setChartDataUri(dataUri);
     setAnalysisResult(null);
     setError(null);
-    setShowNotAChartWarning(false);
   };
-
+  console.log();
   const handleFileReset = () => {
     setChartDataUri(null);
     setAnalysisResult(null);
+    setUsedModel("");
+    setUsedProvider("");
     setIsLoading(false);
     setError(null);
-    setShowNotAChartWarning(false);
   };
 
   const handleAnalyzeChart = async () => {
@@ -94,56 +97,53 @@ export default function ScanChartPage() {
     setIsLoading(true);
     setError(null);
     setAnalysisResult(null);
-    setShowNotAChartWarning(false);
 
     try {
-      let aiPersona: string | undefined = undefined;
-      let aiModelName: string | undefined = undefined;
-
-      if (typeof window !== "undefined") {
-        aiPersona = localStorage.getItem("aiCustomPersona") || undefined;
-        if (!aiPersona || aiPersona.trim() === "") {
-          aiPersona = undefined;
-        }
-        aiModelName =
-          localStorage.getItem("aiModelNamePreference") || undefined;
-        if (!aiModelName || aiModelName.trim() === "") {
-          aiModelName = undefined;
-        }
-      }
-
-      const input: AnalyzeForexChartInput = {
-        chartDataUri,
-        aiPersona,
-        aiModelName,
-      };
-
-      const result = (await analyzeForexChart(
-        input
-      )) as ExtendedAnalyzeForexChartOutput;
-
+      // Deduct token first for non-admin users
       let tokenDeductedSuccessfully = true;
       if (currentUser && currentUser.role !== "admin") {
         const tokenDeducted = await deductToken();
         if (!tokenDeducted) {
           setIsLoading(false);
           tokenDeductedSuccessfully = false;
-          // Pesan error token tidak cukup sudah ditangani di deductToken
           return;
         }
       }
 
-      setAnalysisResult(result);
-      if (result.isLikelyChart === false) {
-        setShowNotAChartWarning(true);
-      }
-      toast({
-        title: "Analisis Selesai",
-        description: `Rekomendasi: ${result.recommendation}. Model Teks: ${
-          result.usedTextModel || "Tidak diketahui"
-        }`,
+      // Call the Firebase function
+      const response = await fetch("/api/analyze-chart", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          chartImageUri: chartDataUri,
+        }),
       });
 
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data: ApiResponse = await response.json();
+      console.log("🧠 Model dari server:", data.aiModelName);
+      console.log("📡 Provider dari server:", data.provider);
+      console.log("📦 Full response:", data);
+
+      if (!data.success) {
+        throw new Error("Analysis failed");
+      }
+
+      setAnalysisResult(data.result);
+      setUsedModel(data.aiModelName);
+      setUsedProvider(data.provider);
+
+      toast({
+        title: "Analisis Selesai",
+        description: `Rekomendasi: ${data.result.recommendation}. Provider: ${data.provider}, aiModelName: ${data.aiModelName}`,
+      });
+
+      // Save to history for admin users
       if (
         currentUser &&
         currentUser.role === "admin" &&
@@ -154,10 +154,9 @@ export default function ScanChartPage() {
           id: `analysis-${Date.now()}`,
           date: new Date().toISOString(),
           chartImageUrl: chartDataUri,
-          recommendation: result.recommendation,
-          reasoning: result.reasoning,
-          isLikelyChart: result.isLikelyChart,
-          usedTextModel: result.usedTextModel,
+          recommendation: data.result.recommendation,
+          reasoning: data.result.explanation,
+          usedTextModel: `${data.provider} - ${data.aiModelName}`,
           accuracy: "Pending",
         };
 
@@ -178,6 +177,12 @@ export default function ScanChartPage() {
             "chartAnalysesHistory",
             JSON.stringify(updatedHistory)
           );
+
+          toast({
+            title: "Disimpan ke Riwayat (Admin)",
+            description:
+              "Hasil analisis telah ditambahkan ke halaman riwayat Anda.",
+          });
         } catch (e) {
           console.error("Gagal menyimpan riwayat ke localStorage:", e);
           toast({
@@ -216,27 +221,18 @@ export default function ScanChartPage() {
   if (analysisResult && chartDataUri) {
     return (
       <div className="space-y-6">
-        {showNotAChartWarning && (
-          <Alert variant="destructive" className="max-w-2xl mx-auto">
-            <Terminal className="h-4 w-4" />
-            <AlertTitle>Peringatan Gambar</AlertTitle>
-            <AlertDescription>
-              AI mendeteksi bahwa gambar yang Anda unggah kemungkinan bukan
-              merupakan grafik/chart. Hasil analisis mungkin tidak akurat.
-            </AlertDescription>
-          </Alert>
-        )}
         <RecommendationDisplay
-          imageDataUri={analysisResult.annotatedChartDataUri || chartDataUri}
+          imageDataUri={chartDataUri}
           recommendation={analysisResult.recommendation}
-          reasoning={analysisResult.reasoning}
+          reasoning={analysisResult.explanation}
           onBack={handleFileReset}
-          usedTextModel={analysisResult.usedTextModel}
+          usedTextModel={`${usedProvider} - ${usedModel} `}
+          confidence={analysisResult.confidence}
         />
       </div>
     );
   }
-
+  console.log(usedModel);
   return (
     <div className="container mx-auto py-8 px-4 flex flex-col items-center space-y-8">
       {currentUser &&
@@ -291,10 +287,10 @@ export default function ScanChartPage() {
           Analisis Grafik
           {currentUser.role !== "admin" &&
             currentUser.tokens > 0 &&
-            "(Gunakan 1 Token)"}
+            " (Gunakan 1 Token)"}
           {currentUser.role !== "admin" &&
             currentUser.tokens <= 0 &&
-            "(Token Habis)"}
+            " (Token Habis)"}
         </Button>
       )}
 
@@ -340,16 +336,15 @@ export default function ScanChartPage() {
 
       {!chartDataUri && !isLoading && (
         <Alert className="w-full max-w-lg mt-8">
-          <Terminal className="h-4 w-4" />
+          <Info className="h-4 w-4" />
           <AlertTitle>Selamat Datang di ChartSight AI</AlertTitle>
           <AlertDescription>
             Unggah gambar grafik Forex atau pindai menggunakan kamera Anda untuk
             mendapatkan wawasan perdagangan berbasis AI. AI akan memberikan
-            rekomendasi Beli, Jual, atau Tunggu beserta alasannya, dan mencoba
-            memberikan anotasi visual pada grafik Anda (jika menggunakan model
-            Google AI).
+            rekomendasi Beli, Jual, atau Tunggu beserta alasannya.
             {currentUser.role !== "admin" &&
-              " Setiap analisis menggunakan 1 token."}
+              " Setiap analisis menggunakan 1 token."}{" "}
+            Konfigurasi AI dapat diatur melalui Firebase Realtime Database.
           </AlertDescription>
         </Alert>
       )}
