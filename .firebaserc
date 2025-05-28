@@ -1,6 +1,7 @@
 {
   "projects": {
-    "chartsight": "chartsight-ai-lb07r"
+    "chartsight": "chartsight-ai-lb07r",
+    "default": "chartsight-ai-lb07r"
   },
   "targets": {},
   "etags": {},

@@ -1,5 +1,4 @@
 import { database } from "@/lib/firebase-admin";
-
 export interface AIConfig {
   apiKey: string;
   aiModelName: string;
@@ -33,3 +32,4 @@ function getDefaultPersona(): string {
     "Fokus pada pola teknikal, tren, support/resistance, dan risk/reward ratio."
   );
 }
+

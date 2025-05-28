@@ -4,5 +4,9 @@
       "source": "ai_functions",
       "codebase": "ai_functions"
     }
-  ]
+  ],
+  "hosting": {
+    "public": "out",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"]
+  }
 }
