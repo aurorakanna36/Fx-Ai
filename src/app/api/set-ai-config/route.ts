@@ -6,7 +6,7 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { apiKey, aiModelName, aiPersona } = body;
-
+    console.log("daata", body);
     if (!apiKey || typeof apiKey !== "string") {
       return NextResponse.json(
         { success: false, error: "API key wajib diisi" },
