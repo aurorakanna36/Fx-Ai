@@ -73,8 +73,8 @@ export default function AiIntegrationPage() {
           aiPersona: data.aiPersona?.trim() || DEFAULT_AI_PERSONA,
         }),
       });
+
       const result = await res.json();
-      console.log("res: ", result);
       if (!res.ok || !result.success) {
         throw new Error(result.error || "Gagal menyimpan konfigurasi AI");
       }
